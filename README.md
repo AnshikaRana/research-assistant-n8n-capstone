@@ -110,17 +110,3 @@ The full guide is in [docs/05-setup-and-run.md](docs/05-setup-and-run.md).
 - A digest shows at most 10 papers per topic per run. The rest stay `digested = false` and go into the next digest.
 - The relevance gate is generous on clearly on-topic searches (all 36 stored papers scored 0.92–0.98). Raise the 0.70 threshold in 02 for stricter filtering.
 
-## Deliverables checklist (capstone brief)
-
-| Requirement | Where |
-|---|---|
-| Problem analysis (context, stakeholders, pain points, objectives) | [docs/01-problem-analysis.md](docs/01-problem-analysis.md) |
-| Workflow architecture (system, interaction diagram, event flow) | [docs/02-architecture.md](docs/02-architecture.md) |
-| Implementation: 4–6+ workflows, 20–25+ nodes | [workflows/](workflows), 8 workflows / 114 nodes |
-| Advanced features | [docs/03-workflow-documentation.md](docs/03-workflow-documentation.md#3-workflow-documentation) |
-| Exported workflow JSON | [workflows/](workflows) |
-| Workflow documentation | [docs/03-workflow-documentation.md](docs/03-workflow-documentation.md) |
-| Architecture diagram | [docs/architecture.png](docs/architecture.png) |
-| Demo video (5–10 min) | script: [demo/demo-video-script.md](demo/demo-video-script.md) · video link: *add after recording* |
-| GitHub repository with README | this repository |
-| Presentation (10–12 slides) | [presentation/](presentation) |
