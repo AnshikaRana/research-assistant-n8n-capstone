@@ -1,0 +1,53 @@
+{
+  "_note": "Real record from research_papers after the live run on 7 Oct 2026 (02 → 03 → 04). The abstract is omitted for brevity. pdf_status is drive_upload_failed because the Google Drive credential is not connected yet.",
+  "record": {
+    "paper_id": "PAPER-1791352229309-3",
+    "topic_id": "TOPIC-1791255809224-I8X8X",
+    "title": "FAIR-RAG: Faithful Adaptive Iterative Refinement for Retrieval-Augmented Generation",
+    "authors": [
+      "Mohammad Aghajani Asl",
+      "Majid Asgari-Bidhendi",
+      "Behrooz Minaei-Bidgoli"
+    ],
+    "source": "arxiv",
+    "arxiv_id": "2510.22344",
+    "doi": null,
+    "url": "https://arxiv.org/abs/2510.22344v1",
+    "publication_date": "2025-10-25T15:59:33.000Z",
+    "dedupe_key": "arxiv:2510.22344",
+    "relevance_score": 0.95,
+    "relevant": true,
+    "summary": "The paper introduces FAIR-RAG, an agentic Retrieval-Augmented Generation framework that iteratively refines evidence for complex multi-hop queries. A core Structured Evidence Assessment (SEA) module decomposes queries into a checklist of required findings, audits retrieved evidence to confirm facts and detect explicit gaps, and triggers an Adaptive Query Refinement agent to fetch missing information. The cycle repeats until sufficient evidence is gathered, producing a final strictly faithful generation. Experiments on challenging multi-hop QA benchmarks show substantial improvements over strong iterative baselines.",
+    "key_findings": [
+      "FAIR-RAG substantially outperforms strong iterative baselines on multi-hop QA benchmarks, achieving an F1 of 0.453 on HotpotQA (an absolute improvement of 8.3 points over the strongest iterative baseline).",
+      "Structured Evidence Assessment combined with an Adaptive Query Refinement loop effectively identifies and fills informational gaps, yielding more comprehensive and faithful contexts for generation."
+    ],
+    "methodology": "FAIR-RAG is an agentic RAG pipeline that uses an Iterative Refinement Cycle driven by a Structured Evidence Assessment (SEA) to decompose queries into a checklist, audit retrieved evidence for confirmed facts and gaps, and invoke an Adaptive Query Refinement agent to generate targeted sub-queries until evidence sufficiency is reached for a final faithful generation.",
+    "datasets": [
+      "HotpotQA",
+      "2WikiMultiHopQA",
+      "MusiQue"
+    ],
+    "models": [
+      "FAIR-RAG",
+      "RAG",
+      "LLMs"
+    ],
+    "limitations": [
+      "Existing RAG frameworks often fail on complex multi-hop queries and can propagate noise or miss comprehensive context.",
+      "Iterative or adaptive methods prior to FAIR-RAG lack a robust mechanism to systematically identify and fill evidence gaps (a gap FAIR-RAG aims to address)."
+    ],
+    "research_gap": "There is a need for a structured, evidence-driven refinement process that explicitly identifies and fills informational gaps to enable reliable multi-hop reasoning in RAG systems.",
+    "research_significance": "FAIR-RAG demonstrates that explicit gap analysis and adaptive iterative retrieval materially improves faithfulness and accuracy of LLMs on complex, knowledge-intensive tasks.",
+    "extracted_keywords": "retrieval-augmented generation, iterative refinement, structured evidence assessment, adaptive query refinement, multi-hop qa, hallucination, faithfulness",
+    "research_category": "NLP",
+    "processing_status": "summarized",
+    "citation_apa": "Asl, M. A., Asgari-Bidhendi, M., & Minaei-Bidgoli, B. (2025). FAIR-RAG: Faithful Adaptive Iterative Refinement for Retrieval-Augmented Generation. arXiv preprint arXiv:2510.22344. https://arxiv.org/abs/2510.22344v1",
+    "bibtex": "@misc{asl2025fair,\n  title = {FAIR-RAG: Faithful Adaptive Iterative Refinement for Retrieval-Augmented Generation},\n  author = {Mohammad Aghajani Asl and Majid Asgari-Bidhendi and Behrooz Minaei-Bidgoli},\n  year = {2025},\n  eprint = {2510.22344},\n  archivePrefix = {arXiv},\n  url = {https://arxiv.org/abs/2510.22344v1},\n  keywords = {retrieval-augmented generation, iterative refinement, structured evidence assessment, adaptive query refinement, multi-hop qa, hallucination, faithfulness}\n}",
+    "pdf_url": "https://arxiv.org/pdf/2510.22344v1",
+    "pdf_status": "drive_upload_failed",
+    "processing_error": "Drive upload failed: Node does not have any credentials set",
+    "archived": true,
+    "digested": false
+  }
+}

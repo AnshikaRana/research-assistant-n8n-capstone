@@ -1,0 +1,726 @@
+{
+  "name": "05 - Weekly Research Digest & Notifications",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 05 \u00b7 Research Digest & Notifications\nDaily 09:00 \u2192 active topics due today (frequency daily / weekly=Mon / monthly=1st) \u2192 new `summarized` papers with `digested = false` \u2192 AI overview (validated, falls back to plain list) \u2192 HTML email via Gmail.\n\u2714 sent \u2192 papers `digested = true`, row in `digest_log` (status sent)\n\u2716 Gmail failure \u2192 `digest_log` status failed, papers stay undigested \u2192 retried next run.\n**Credentials**: OpenAI \u00b7 Gmail.",
+        "height": 280,
+        "width": 680
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -560
+      ],
+      "id": "1fc21f52-9a05-4dfa-ac4a-4ed6aa0e0a03",
+      "name": "Note 0f9d35"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -100
+      ],
+      "id": "b3c991ac-7306-4b5e-8495-c85e4716fccf",
+      "name": "Manual Run (testing)"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        100
+      ],
+      "id": "624b997f-9e76-4d9b-8184-05877e22debe",
+      "name": "Daily 09:00"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "EZzcbjllTAxkF1oL",
+          "mode": "list",
+          "cachedResultName": "research_topics",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/EZzcbjllTAxkF1oL"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "active",
+              "condition": "isTrue"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        0
+      ],
+      "id": "f0ad9fb3-f26f-447a-841a-02be06b47365",
+      "name": "Get Active Topics"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Decide which active topics get a digest today, honouring the\n// frequency chosen at registration (daily | weekly = Monday | monthly = 1st).\n// A manual test run sends digests for every active topic.\nconst manual = $('Manual Run (testing)').isExecuted;\nconst today = $now.setZone('Asia/Kolkata');\nconst due = f => manual || f === 'daily' || (f === 'weekly' && today.weekday === 1) || (f === 'monthly' && today.day === 1);\nreturn $input.all()\n  .filter(i => i.json.active === true && i.json.email && due(String(i.json.frequency || 'weekly')))\n  .map(i => ({ json: { topic_id: i.json.topic_id, topic: i.json.topic, researcher: i.json.researcher,\n                       email: i.json.email, keywords: i.json.keywords, frequency: i.json.frequency } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "23963488-4b55-4a99-a616-fd5e8e3fd052",
+      "name": "Select Topics Due Today"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "lyPPJZ6tVkwJ23CJ",
+          "mode": "list",
+          "cachedResultName": "research_papers",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/lyPPJZ6tVkwJ23CJ"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "processing_status",
+              "condition": "eq",
+              "keyValue": "summarized"
+            },
+            {
+              "keyName": "digested",
+              "condition": "isFalse"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        0
+      ],
+      "id": "baf8aa5c-7663-46ae-9f59-dfc28bee30b8",
+      "name": "Get Undigested Papers",
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Attach each due topic's new (not yet digested) summarized papers\nconst topics = $('Select Topics Due Today').all().map(i => i.json);\nconst papers = $input.all().map(i => i.json).filter(p => p.paper_id);\nconst out = [];\nfor (const t of topics) {\n  const mine = papers\n    .filter(p => p.topic_id === t.topic_id)\n    .sort((a, b) => (b.relevance_score || 0) - (a.relevance_score || 0))\n    .slice(0, 10);\n  if (!mine.length) continue;  // nothing new -> no email\n  out.push({ json: { ...t, paper_count: mine.length, paper_ids: mine.map(p => p.paper_id), papers: mine.map(p => ({\n    paper_id: p.paper_id, title: p.title, authors: p.authors, url: p.url, publication_date: p.publication_date,\n    summary: p.summary, key_findings: p.key_findings, category: p.research_category, keywords: p.extracted_keywords,\n    relevance_score: p.relevance_score, citation_apa: p.citation_apa, drive_file_url: p.drive_file_url, pdf_url: p.pdf_url\n  })) } });\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "id": "dd72dd9b-a613-4bb7-8ea8-8853ad91a5ca",
+      "name": "Group Papers by Topic"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are writing the opening of a research digest email for {{ $json.researcher }}.\nResearch Topic: {{ $json.topic }}\nNew papers (title :: summary):\n{{ $json.papers.map((p, i) => (i + 1) + '. ' + p.title + ' :: ' + (p.summary || '')).join('\\n') }}\n\nReturn ONLY valid JSON in exactly this format:\n{\n\"overview\": \"3-4 sentence overview of what these papers collectively show\",\n\"trends\": [\"2-4 short emerging trends\"],\n\"recommended_first\": [\"up to 3 paper titles copied exactly from the list, most important first\"],\n\"open_questions\": [\"1-3 open research questions\"]\n}\nDo not return Markdown or any text outside the JSON object.",
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {
+          "batchSize": 3,
+          "delayBetweenBatches": 1000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1100,
+        0
+      ],
+      "id": "1f275d94-f10d-4d17-bbbd-33850a6197d0",
+      "name": "Write Digest Overview",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1100,
+        220
+      ],
+      "id": "58a5b05a-e245-4a83-a48d-82e02264014c",
+      "name": "OpenAI Chat Model"
+    },
+    {
+      "parameters": {
+        "jsCode": "function parseLlmJson(text) {\n  const raw = String(text ?? '')\n    .replace(/^```(?:json)?\\s*/i, '')\n    .replace(/```\\s*$/, '')\n    .trim();\n  return JSON.parse(raw);\n}\n\n// Build the HTML digest. If the AI overview fails, fall back to a plain list.\nconst groups = $('Group Papers by Topic').all();\nconst esc = s => String(s ?? '').replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]));\nconst list = v => { try { const a = typeof v === 'string' ? JSON.parse(v) : v; return Array.isArray(a) ? a : []; } catch { return []; } };\n\nreturn $input.all().map((item, i) => {\n  const g = groups[i].json;\n  let ai = null;\n  try { ai = item.json.error ? null : parseLlmJson(item.json.text); } catch { ai = null; }\n  const titles = new Set(g.papers.map(p => p.title));\n  const recommended = list(ai?.recommended_first).filter(t => titles.has(t));\n\n  const intro = ai?.overview\n    ? `<p>${esc(ai.overview)}</p>` +\n      (list(ai.trends).length ? `<p><b>Emerging trends:</b></p><ul>${list(ai.trends).map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '') +\n      (recommended.length ? `<p><b>Read first:</b> ${recommended.map(esc).join(' \u00b7 ')}</p>` : '') +\n      (list(ai.open_questions).length ? `<p><b>Open questions:</b></p><ul>${list(ai.open_questions).map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '')\n    : `<p>${g.paper_count} new paper(s) matched your topic.</p>`;\n\n  const cards = g.papers.map(p => `\n    <div style=\"border:1px solid #ddd;border-radius:8px;padding:12px;margin:12px 0\">\n      <h3 style=\"margin:0 0 4px\"><a href=\"${esc(p.url)}\">${esc(p.title)}</a></h3>\n      <div style=\"color:#666;font-size:13px\">${esc(list(p.authors).slice(0, 5).join(', '))} \u00b7 ${esc(String(p.publication_date || '').slice(0, 10))} \u00b7 ${esc(p.category || '')} \u00b7 relevance ${Number(p.relevance_score || 0).toFixed(2)}</div>\n      <p>${esc(p.summary)}</p>\n      ${list(p.key_findings).length ? `<ul>${list(p.key_findings).map(f => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}\n      <div style=\"font-size:13px\">${p.drive_file_url ? `<a href=\"${esc(p.drive_file_url)}\">PDF in Drive</a> \u00b7 ` : (p.pdf_url ? `<a href=\"${esc(p.pdf_url)}\">PDF</a> \u00b7 ` : '')}<i>${esc(p.citation_apa || '')}</i></div>\n    </div>`).join('');\n\n  return { json: {\n    ...g,\n    ai_overview_ok: !!ai?.overview,\n    subject: `Research digest: ${g.topic} \u2013 ${g.paper_count} new paper(s)`,\n    html: `<div style=\"font-family:Arial,sans-serif;max-width:720px\"><h2>Hi ${esc(g.researcher)},</h2>\n      <p>Here is your ${esc(g.frequency)} research digest for <b>${esc(g.topic)}</b>.</p>${intro}${cards}\n      <p style=\"color:#888;font-size:12px\">AI Research Assistant Platform \u00b7 topic ${esc(g.topic_id)}</p></div>`\n  }};\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        0
+      ],
+      "id": "cd9df47e-2644-4098-b627-46889b7994e0",
+      "name": "Build Digest Email"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1580,
+        0
+      ],
+      "id": "53143fc4-dd27-488f-8435-ed3083608a80",
+      "name": "Send Digest Email",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "PbEiV5UCtCT0Qxcd",
+          "mode": "list",
+          "cachedResultName": "digest_log",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/PbEiV5UCtCT0Qxcd"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "digest_id": "={{ 'DIGEST-' + $now.toMillis() + '-' + $itemIndex }}",
+            "topic_id": "={{ $('Build Digest Email').item.json.topic_id }}",
+            "topic": "={{ $('Build Digest Email').item.json.topic }}",
+            "email": "={{ $('Build Digest Email').item.json.email }}",
+            "paper_count": "={{ $('Build Digest Email').item.json.paper_count }}",
+            "status": "sent"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "digest_id",
+              "displayName": "digest_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic_id",
+              "displayName": "topic_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "paper_count",
+              "displayName": "paper_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1820,
+        -120
+      ],
+      "id": "ca0fe490-2465-4f3d-986d-0cf3d21db8b7",
+      "name": "Log Digest Sent"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fan out: one item per paper in each sent digest so each row can be marked digested\nreturn $input.all().flatMap((item, i) =>\n  $('Build Digest Email').itemMatching(i).json.paper_ids.map(paper_id => ({ json: { paper_id } })));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2040,
+        -120
+      ],
+      "id": "06d11301-e477-462c-91da-5ca22131b59d",
+      "name": "Expand Paper IDs"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "lyPPJZ6tVkwJ23CJ",
+          "mode": "list",
+          "cachedResultName": "research_papers",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/lyPPJZ6tVkwJ23CJ"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "paper_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.paper_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "digested": true
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "digested",
+              "displayName": "digested",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2260,
+        -120
+      ],
+      "id": "8e33a45a-9f4c-4adc-85d5-e4027a877f7e",
+      "name": "Mark Papers Digested"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "PbEiV5UCtCT0Qxcd",
+          "mode": "list",
+          "cachedResultName": "digest_log",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/PbEiV5UCtCT0Qxcd"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "digest_id": "={{ 'DIGEST-' + $now.toMillis() + '-' + $itemIndex }}",
+            "topic_id": "={{ $('Build Digest Email').item.json.topic_id }}",
+            "topic": "={{ $('Build Digest Email').item.json.topic }}",
+            "email": "={{ $('Build Digest Email').item.json.email }}",
+            "paper_count": "={{ $('Build Digest Email').item.json.paper_count }}",
+            "status": "failed"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "digest_id",
+              "displayName": "digest_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic_id",
+              "displayName": "topic_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "paper_count",
+              "displayName": "paper_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1820,
+        120
+      ],
+      "id": "c2f7a38d-e137-44cd-a5af-40f420db685c",
+      "name": "Log Digest Failed"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ran = n => { try { return $(n).all().length; } catch { return 0; } };\nconst sent = ran('Log Digest Sent');\nconst failed = ran('Log Digest Failed');\nreturn [{ json: {\n  workflow: $workflow.name,\n  event: 'digests_sent',\n  level: failed ? 'warning' : 'info',\n  message: `${sent} digest(s) sent, ${failed} failed`,\n  details: {},\n  execution_id: $execution.id\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2700,
+        0
+      ],
+      "id": "496f27c5-5c49-476c-8bb1-97cbbcf59a05",
+      "name": "Build Run Summary"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "KiRjquybEkOBf87E",
+          "mode": "list",
+          "cachedResultName": "06 - Error Handler & Audit Log",
+          "cachedResultUrl": "/workflow/KiRjquybEkOBf87E"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2920,
+        0
+      ],
+      "id": "755de693-c62a-48b8-9f57-fe39606c750c",
+      "name": "Log to Audit Trail"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2480,
+        0
+      ],
+      "id": "898073ea-6542-4d57-97ec-b25a0ba420ca",
+      "name": "Collect Outcomes"
+    }
+  ],
+  "connections": {
+    "Manual Run (testing)": {
+      "main": [
+        [
+          {
+            "node": "Get Active Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 09:00": {
+      "main": [
+        [
+          {
+            "node": "Get Active Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Topics": {
+      "main": [
+        [
+          {
+            "node": "Select Topics Due Today",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Topics Due Today": {
+      "main": [
+        [
+          {
+            "node": "Get Undigested Papers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Undigested Papers": {
+      "main": [
+        [
+          {
+            "node": "Group Papers by Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group Papers by Topic": {
+      "main": [
+        [
+          {
+            "node": "Write Digest Overview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Digest Overview": {
+      "main": [
+        [
+          {
+            "node": "Build Digest Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Digest Email": {
+      "main": [
+        [
+          {
+            "node": "Send Digest Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Write Digest Overview",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Digest Email": {
+      "main": [
+        [
+          {
+            "node": "Log Digest Sent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Digest Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Digest Sent": {
+      "main": [
+        [
+          {
+            "node": "Expand Paper IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand Paper IDs": {
+      "main": [
+        [
+          {
+            "node": "Mark Papers Digested",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Papers Digested": {
+      "main": [
+        [
+          {
+            "node": "Collect Outcomes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Digest Failed": {
+      "main": [
+        [
+          {
+            "node": "Collect Outcomes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Collect Outcomes": {
+      "main": [
+        [
+          {
+            "node": "Build Run Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Run Summary": {
+      "main": [
+        [
+          {
+            "node": "Log to Audit Trail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "KiRjquybEkOBf87E"
+  }
+}

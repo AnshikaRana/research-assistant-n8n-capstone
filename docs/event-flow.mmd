@@ -1,0 +1,16 @@
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial","fontSize":"15px","primaryColor":"#DCEBEE","primaryBorderColor":"#1B4965","lineColor":"#5A6B7B"}}}%%
+flowchart TB
+  A[01 / 01.1 / 01.2<br/>register topic] -->|"research_topics.active = true"| B[02 search + LLM relevance]
+  B -->|"research_papers: processing_status = pending_ai, processed = false"| C[03 summarise + keywords]
+  C -->|"processing_status = summarized (or ai_failed)"| D[04 references, PDF archive, search API]
+  C -->|"processing_status = summarized"| E[05 digest email]
+  D -->|"archived = true, pdf_status, citation_apa, bibtex"| E
+  E -->|"digested = true + digest_log row"| F([done])
+  A -. "run events (Execute Workflow)" .-> G[06 Error Handler & Audit Log]
+  B -.-> G
+  C -.-> G
+  D -.-> G
+  E -.-> G
+  B -. "failed execution (Error Workflow setting)" .-> G
+  G --> H[(audit_log)]
+  G -->|"level = error"| I[admin email]

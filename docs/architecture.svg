@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="860" viewBox="0 0 1900 860" font-family="Arial, Helvetica, sans-serif">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A5A6A"/></marker></defs>
+<rect width="1900" height="860" fill="#FFFFFF"/>
+<text x="40" y="44" font-size="26" font-weight="700" fill="#1B2631">AI Research Assistant Platform · n8n system architecture</text>
+<text x="40" y="70" font-size="15" fill="#4A5A6A">8 workflows · 4 n8n Data Tables · 5 external services · workflows hand off through status fields, not direct calls</text>
+<text x="40" y="130" font-size="12" font-weight="700" letter-spacing="1.5" fill="#7A8794">EXTERNAL SERVICES</text>
+<text x="40" y="300" font-size="12" font-weight="700" letter-spacing="1.5" fill="#7A8794">WORKFLOWS (n8n Cloud)</text>
+<text x="40" y="560" font-size="12" font-weight="700" letter-spacing="1.5" fill="#7A8794">DATA (n8n Data Tables)</text>
+<rect x="395" y="145" width="130" height="64" rx="10" fill="#FFF4E0" stroke="#C9822B" stroke-width="2"/>
+<text x="460.0" y="183.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2631">arXiv API</text>
+<rect x="535" y="145" width="170" height="64" rx="10" fill="#FFF4E0" stroke="#C9822B" stroke-width="2"/>
+<text x="620.0" y="183.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2631">Semantic Scholar</text>
+<rect x="760" y="145" width="180" height="64" rx="10" fill="#FFF4E0" stroke="#C9822B" stroke-width="2"/>
+<text x="850.0" y="167.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2631">OpenAI</text>
+<text x="850.0" y="191.0" text-anchor="middle" font-size="14" fill="#3B4A57">gpt-5-mini</text>
+<rect x="1090" y="145" width="160" height="64" rx="10" fill="#FFF4E0" stroke="#C9822B" stroke-width="2"/>
+<text x="1170.0" y="183.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2631">Google Drive</text>
+<rect x="1410" y="145" width="160" height="64" rx="10" fill="#FFF4E0" stroke="#C9822B" stroke-width="2"/>
+<text x="1490.0" y="183.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2631">Gmail</text>
+<rect x="70" y="145" width="260" height="64" rx="10" fill="#FFFFFF" stroke="#1B4965" stroke-width="2"/>
+<text x="200.0" y="167.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2631">Researcher / student</text>
+<text x="200.0" y="191.0" text-anchor="middle" font-size="14" fill="#3B4A57">web form · REST API · inbox</text>
+<rect x="70" y="315" width="260" height="120" rx="10" fill="#DCEBEE" stroke="#1B4965" stroke-width="2"/>
+<text x="200.0" y="365.0" text-anchor="middle" font-size="17" font-weight="700" fill="#1B2631">01 Topic Registration</text>
+<text x="200.0" y="389.0" text-anchor="middle" font-size="14" fill="#3B4A57">01 API webhook · 01.1 Form</text>
+<text x="200.0" y="408.0" text-anchor="middle" font-size="14" fill="#3B4A57">01.2 Processor webhook</text>
+<rect x="400" y="315" width="260" height="120" rx="10" fill="#DCEBEE" stroke="#1B4965" stroke-width="2"/>
+<text x="530.0" y="365.0" text-anchor="middle" font-size="17" font-weight="700" fill="#1B2631">02 Paper Search</text>
+<text x="530.0" y="389.0" text-anchor="middle" font-size="14" fill="#3B4A57">arXiv + Semantic Scholar</text>
+<text x="530.0" y="408.0" text-anchor="middle" font-size="14" fill="#3B4A57">LLM relevance ≥ 0.70 · daily 08:00</text>
+<rect x="720" y="315" width="260" height="120" rx="10" fill="#DCEBEE" stroke="#1B4965" stroke-width="2"/>
+<text x="850.0" y="365.0" text-anchor="middle" font-size="17" font-weight="700" fill="#1B2631">03 AI Summarization</text>
+<text x="850.0" y="389.0" text-anchor="middle" font-size="14" fill="#3B4A57">summary · findings · gaps</text>
+<text x="850.0" y="408.0" text-anchor="middle" font-size="14" fill="#3B4A57">keywords · hourly</text>
+<rect x="1040" y="315" width="260" height="120" rx="10" fill="#DCEBEE" stroke="#1B4965" stroke-width="2"/>
+<text x="1170.0" y="365.0" text-anchor="middle" font-size="17" font-weight="700" fill="#1B2631">04 References &amp; Repository</text>
+<text x="1170.0" y="389.0" text-anchor="middle" font-size="14" fill="#3B4A57">APA + BibTeX · PDF archive</text>
+<text x="1170.0" y="408.0" text-anchor="middle" font-size="14" fill="#3B4A57">search API · daily 10:00</text>
+<rect x="1360" y="315" width="260" height="120" rx="10" fill="#DCEBEE" stroke="#1B4965" stroke-width="2"/>
+<text x="1490.0" y="365.0" text-anchor="middle" font-size="17" font-weight="700" fill="#1B2631">05 Research Digest</text>
+<text x="1490.0" y="389.0" text-anchor="middle" font-size="14" fill="#3B4A57">daily / weekly / monthly</text>
+<text x="1490.0" y="408.0" text-anchor="middle" font-size="14" fill="#3B4A57">HTML email · daily 09:00</text>
+<path d="M200,209 L200,315" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)"/>
+<text x="200" y="268" text-anchor="middle" font-size="13" fill="#2E3D4A" paint-order="stroke" stroke="#FFFFFF" stroke-width="5">register topic</text>
+<path d="M460,209 L470,315" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)" marker-start="url(#ah)"/>
+<path d="M620,209 L590,315" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)" marker-start="url(#ah)"/>
+<path d="M800,209 C760,260 640,270 600,315" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)" marker-start="url(#ah)"/>
+<path d="M850,209 L850,315" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)" marker-start="url(#ah)"/>
+<path d="M900,209 C960,250 1040,250 1100,262 C1300,275 1440,262 1460,315" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)" marker-start="url(#ah)"/>
+<text x="1330" y="252" text-anchor="middle" font-size="13" fill="#2E3D4A" paint-order="stroke" stroke="#FFFFFF" stroke-width="5">digest overview</text>
+<path d="M1170,315 L1170,209" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)"/>
+<text x="1222" y="300" text-anchor="middle" font-size="13" fill="#2E3D4A" paint-order="stroke" stroke="#FFFFFF" stroke-width="5">PDFs + .bib</text>
+<path d="M1520,315 L1520,209" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)"/>
+<text x="1580" y="268" text-anchor="middle" font-size="13" fill="#2E3D4A" paint-order="stroke" stroke="#FFFFFF" stroke-width="5">digest email</text>
+<path d="M1410,177 C1100,100 500,100 330,170" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)"/>
+<text x="870" y="103" text-anchor="middle" font-size="13" fill="#2E3D4A" paint-order="stroke" stroke="#FFFFFF" stroke-width="5">digest arrives in inbox</text>
+<path d="M70,760 L1630,760 L1630,375" fill="none" stroke="#9B2C2C" stroke-width="2" stroke-dasharray="7,6"/>
+<path d="M130,435 L130,760" fill="none" stroke="#9B2C2C" stroke-width="1.5" stroke-dasharray="4,6" opacity="0.7"/>
+<path d="M470,435 L470,760" fill="none" stroke="#9B2C2C" stroke-width="1.5" stroke-dasharray="4,6" opacity="0.7"/>
+<path d="M790,435 L790,760" fill="none" stroke="#9B2C2C" stroke-width="1.5" stroke-dasharray="4,6" opacity="0.7"/>
+<path d="M1110,435 L1110,760" fill="none" stroke="#9B2C2C" stroke-width="1.5" stroke-dasharray="4,6" opacity="0.7"/>
+<path d="M1430,435 L1430,760" fill="none" stroke="#9B2C2C" stroke-width="1.5" stroke-dasharray="4,6" opacity="0.7"/>
+<path d="M1630,375 L1660,375" fill="none" stroke="#9B2C2C" stroke-width="2" marker-end="url(#ah)"/>
+<path d="M85,587 a115.0,12 0 0,1 230,0 v56 a115.0,12 0 0,1 -230,0 z" fill="#EEF2E6" stroke="#4F7A3A" stroke-width="2"/>
+<path d="M85,587 a115.0,12 0 0,0 230,0" fill="none" stroke="#4F7A3A" stroke-width="2"/>
+<text x="200.0" y="613.0" text-anchor="middle" font-size="16" font-weight="700" fill="#1B2631">research_topics</text>
+<text x="200.0" y="634.0" text-anchor="middle" font-size="13" fill="#3B4A57">topic_key (dedupe) · frequency</text>
+<path d="M400,587 a450.0,12 0 0,1 900,0 v56 a450.0,12 0 0,1 -900,0 z" fill="#EEF2E6" stroke="#4F7A3A" stroke-width="2"/>
+<path d="M400,587 a450.0,12 0 0,0 900,0" fill="none" stroke="#4F7A3A" stroke-width="2"/>
+<text x="850.0" y="613.0" text-anchor="middle" font-size="16" font-weight="700" fill="#1B2631">research_papers</text>
+<text x="850.0" y="634.0" text-anchor="middle" font-size="13" fill="#3B4A57">one row per (topic, paper) · processing_status · pdf_status · archived · digested</text>
+<path d="M1380,587 a110.0,12 0 0,1 220,0 v56 a110.0,12 0 0,1 -220,0 z" fill="#EEF2E6" stroke="#4F7A3A" stroke-width="2"/>
+<path d="M1380,587 a110.0,12 0 0,0 220,0" fill="none" stroke="#4F7A3A" stroke-width="2"/>
+<text x="1490.0" y="613.0" text-anchor="middle" font-size="16" font-weight="700" fill="#1B2631">digest_log</text>
+<text x="1490.0" y="634.0" text-anchor="middle" font-size="13" fill="#3B4A57">sent / failed</text>
+<path d="M200,435 L200,575" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)"/>
+<text x="228" y="520" text-anchor="middle" font-size="13" fill="#2E3D4A" paint-order="stroke" stroke="#FFFFFF" stroke-width="5">write</text>
+<path d="M300,600 C380,560 420,500 470,435" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)"/>
+<text x="392" y="536" text-anchor="middle" font-size="13" fill="#2E3D4A" paint-order="stroke" stroke="#FFFFFF" stroke-width="5">active topics</text>
+<path d="M560,435 L560,575" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)"/>
+<text x="610" y="520" text-anchor="middle" font-size="13" fill="#2E3D4A" paint-order="stroke" stroke="#FFFFFF" stroke-width="5">pending_ai</text>
+<path d="M850,575 L850,435" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)" marker-start="url(#ah)"/>
+<text x="900" y="520" text-anchor="middle" font-size="13" fill="#2E3D4A" paint-order="stroke" stroke="#FFFFFF" stroke-width="5">summarized</text>
+<path d="M1170,575 L1170,435" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)" marker-start="url(#ah)"/>
+<text x="1210" y="520" text-anchor="middle" font-size="13" fill="#2E3D4A" paint-order="stroke" stroke="#FFFFFF" stroke-width="5">archived</text>
+<path d="M1300,610 C1380,560 1430,500 1450,435" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)" marker-start="url(#ah)"/>
+<text x="1395" y="545" text-anchor="middle" font-size="13" fill="#2E3D4A" paint-order="stroke" stroke="#FFFFFF" stroke-width="5">digested</text>
+<path d="M1530,435 L1530,575" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="1660" y="315" width="210" height="120" rx="10" fill="#F7E4E4" stroke="#9B2C2C" stroke-width="2"/>
+<text x="1765.0" y="365.0" text-anchor="middle" font-size="17" font-weight="700" fill="#1B2631">06 Error Handler</text>
+<text x="1765.0" y="389.0" text-anchor="middle" font-size="14" fill="#3B4A57">&amp; Audit Log</text>
+<text x="1765.0" y="408.0" text-anchor="middle" font-size="14" fill="#3B4A57">Error Trigger + sub-workflow</text>
+<path d="M1660,587 a105.0,12 0 0,1 210,0 v56 a105.0,12 0 0,1 -210,0 z" fill="#EEF2E6" stroke="#4F7A3A" stroke-width="2"/>
+<path d="M1660,587 a105.0,12 0 0,0 210,0" fill="none" stroke="#4F7A3A" stroke-width="2"/>
+<text x="1765.0" y="613.0" text-anchor="middle" font-size="16" font-weight="700" fill="#1B2631">audit_log</text>
+<text x="1765.0" y="634.0" text-anchor="middle" font-size="13" fill="#3B4A57">every run + every failure</text>
+<path d="M1765,435 L1765,575" fill="none" stroke="#4A5A6A" stroke-width="2" marker-end="url(#ah)"/>
+<text x="80" y="790" font-size="14" fill="#9B2C2C">- - -  run events (Execute Workflow, fire-and-forget) and failed executions (workflow setting “Error Workflow”) from 01–05 go to 06</text>
+<path d="M1765,315 C1765,250 1660,200 1572,190" fill="none" stroke="#9B2C2C" stroke-width="2" marker-end="url(#ah)"/>
+<text x="1730" y="240" text-anchor="middle" font-size="13" fill="#2E3D4A" paint-order="stroke" stroke="#FFFFFF" stroke-width="5">error alert (admin)</text>
+<rect x="1290" y="815" width="18" height="18" rx="4" fill="#DCEBEE" stroke="#1B4965" stroke-width="2"/>
+<text x="1316" y="829" font-size="13" fill="#3B4A57">n8n workflow</text>
+<rect x="1440" y="815" width="18" height="18" rx="4" fill="#FFF4E0" stroke="#C9822B" stroke-width="2"/>
+<text x="1466" y="829" font-size="13" fill="#3B4A57">external service</text>
+<rect x="1590" y="815" width="18" height="18" rx="4" fill="#EEF2E6" stroke="#4F7A3A" stroke-width="2"/>
+<text x="1616" y="829" font-size="13" fill="#3B4A57">Data Table</text>
+<rect x="1740" y="815" width="18" height="18" rx="4" fill="#F7E4E4" stroke="#9B2C2C" stroke-width="2"/>
+<text x="1766" y="829" font-size="13" fill="#3B4A57">observability</text>
+</svg>

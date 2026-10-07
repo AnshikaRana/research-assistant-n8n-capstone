@@ -1,0 +1,22 @@
+{
+  "_note": "Real output of 05 'Write Digest Overview' (gpt-5-mini) for the topic 'Retrieval Augmented Generation', manual run on 7 Oct 2026 (execution 97). The email itself was not sent because Gmail is not connected yet.",
+  "subject": "Research digest: Retrieval Augmented Generation – 10 new paper(s)",
+  "ai_overview": {
+    "overview": "These papers show RAG moving from proof-of-concept demos toward engineering-first, trust-oriented systems that prioritize faithfulness, attribution, and domain adaptivity. Key contributions include iterative, agentic evidence refinement (FAIR-RAG), context-aware gating and calibration mechanisms to avoid irrelevant or misleading context, and large-scale efforts to standardize evaluation and deployment practices (TREC 2025, RAGEv, and a comprehensive taxonomy). Work spans cross-cutting concerns: stronger benchmarks and metrics, reproducibility challenges with closed LLMs, and practical architectures for heterogeneous data and high-stakes domains.",
+    "trends": [
+      "Faithfulness and attribution-first RAG (iterative evidence auditing and grounding)",
+      "Benchmarking and evaluation maturation (task-specific benchmarks, multi-dimensional metrics, and shared tracks)",
+      "Modular, agentic, and multi-agent architectures for heterogeneous and private data"
+    ],
+    "recommended_first": [
+      "FAIR-RAG: Faithful Adaptive Iterative Refinement for Retrieval-Augmented Generation",
+      "Engineering the RAG Stack: A Comprehensive Review of the Architecture and Trust Frameworks for Retrieval-Augmented Generation Systems",
+      "Overview of the TREC 2025 Retrieval Augmented Generation (RAG) Track"
+    ],
+    "open_questions": [
+      "How can we standardize attribution and faithfulness metrics that generalize across domains and generation styles?",
+      "What are cost- and latency-efficient strategies to guarantee evidence completeness (multi-hop) without excessive retrieval/query cycles?",
+      "How can reproducibility be ensured when core LLM components are closed-source or rapidly changing?"
+    ]
+  }
+}

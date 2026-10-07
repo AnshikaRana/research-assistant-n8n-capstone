@@ -1,0 +1,27 @@
+{
+  "_note": "Ranked output of 04 'Search & Rank Papers' for ?q=faithfulness attribution (execution 99, 7 Oct 2026). Top 5 of 6 results; other fields omitted.",
+  "mode": "search",
+  "count": 6,
+  "results": [
+    {
+      "title": "VISA: Retrieval Augmented Generation with Visual Source Attribution",
+      "match_score": 11
+    },
+    {
+      "title": "Investigating Retrieval-Augmented Generation in Quranic Studies: A Study of 13 Open-Source Large Language Models",
+      "match_score": 7
+    },
+    {
+      "title": "Overview of the TREC 2025 Retrieval Augmented Generation (RAG) Track",
+      "match_score": 6
+    },
+    {
+      "title": "Towards Evaluating Explanations of Vision Transformers for Medical Imaging",
+      "match_score": 4
+    },
+    {
+      "title": "FAIR-RAG: Faithful Adaptive Iterative Refinement for Retrieval-Augmented Generation",
+      "match_score": 2
+    }
+  ]
+}

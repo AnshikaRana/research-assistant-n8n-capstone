@@ -1,0 +1,286 @@
+{
+  "name": "01.1 Research Topic Registration - Form",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 01.1 \u00b7 Registration Form\nPublic n8n form \u2192 forwards to **01.2 Processor** \u2192 shows one of three completion pages (registered / duplicate / invalid).",
+        "height": 180,
+        "width": 460
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        60,
+        -400
+      ],
+      "id": "eadefd91-64ba-422a-9de6-f4f99e5abfa4",
+      "name": "Note b6980c"
+    },
+    {
+      "parameters": {
+        "formTitle": "Research Topic Registration",
+        "formDescription": "Register a research topic for the AI Research Assistant Platform.\nThe system will validate the topic, check for duplicates, and store the registration in the research knowledge base.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Researcher Name",
+              "fieldName": "researcher",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email Address",
+              "fieldType": "email",
+              "fieldName": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Research Topic",
+              "fieldName": "topic",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Research Keywords",
+              "fieldName": "keywords",
+              "placeholder": "comma separated, e.g. transformers, attention",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Research Frequency",
+              "fieldType": "dropdown",
+              "fieldName": "frequency",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "daily"
+                  },
+                  {
+                    "option": "weekly"
+                  },
+                  {
+                    "option": "monthly"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        96,
+        0
+      ],
+      "id": "0684be7d-2601-443a-af92-1592dc7d8466",
+      "name": "On form submission",
+      "webhookId": "f5e40afe-8291-4382-a6f7-b98bb0aae967"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://anshika-rana.app.n8n.cloud/webhook/research-topic-processor",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        368,
+        0
+      ],
+      "id": "4e467377-67df-4789-a89d-b9992c337442",
+      "name": "Send to Registration Processor",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f0500ecd-a21e-4857-a7d2-eb442178ae44",
+                    "leftValue": "={{ $json.duplicate }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "duplicate"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "1d922ccf-3a25-472c-8816-6d915a7cdc51",
+                    "leftValue": "={{ $json.success }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "registered"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "invalid"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        600,
+        0
+      ],
+      "id": "e8e5c9fc-775d-4c76-a4ca-2e2b4b6574ae",
+      "name": "Route by Result"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "Duplicate Entry",
+        "completionMessage": "Registration Not Completed\nThis research topic is already registered. Please submit a different research topic.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        848,
+        -160
+      ],
+      "id": "2268626d-79b2-4e58-ab67-8487c3d6a37f",
+      "name": "Form - Duplicate",
+      "webhookId": "cda67745-c421-4587-b61f-e4e9f06ca72f"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "Registration Successful",
+        "completionMessage": "=Your research topic has been registered successfully.\nTopic ID: {{ $json.topic_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        848,
+        0
+      ],
+      "id": "50499f72-c5a4-47e5-b848-0586de04c71c",
+      "name": "Form - Registered",
+      "webhookId": "6ea925e6-f1e3-415e-84c1-6e376d69b3b7"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "Registration Failed",
+        "completionMessage": "=Please correct the following and submit again:\n{{ ($json.errors || [$json.message]).join('\\n') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        848,
+        160
+      ],
+      "id": "c097a1ed-f439-4222-92a5-805aec45f8e1",
+      "name": "Form - Invalid",
+      "webhookId": "1c620e26-1f0c-4d85-a92d-afe058239bb6"
+    }
+  ],
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Send to Registration Processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Registration Processor": {
+      "main": [
+        [
+          {
+            "node": "Route by Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Result": {
+      "main": [
+        [
+          {
+            "node": "Form - Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Form - Registered",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Form - Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "KiRjquybEkOBf87E"
+  }
+}

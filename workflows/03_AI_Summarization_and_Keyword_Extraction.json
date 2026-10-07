@@ -1,0 +1,583 @@
+{
+  "name": "03 - AI Summarization & Keyword Extraction",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 03 \u00b7 AI Summarization & Keyword Extraction\nHourly \u2192 up to 20 papers where `processed = false` (written by **02**) \u2192 LLM structured summary \u2192 **validated in code** \u2192 update `research_papers`.\n\u2714 valid \u2192 `processing_status = summarized`\n\u2716 AI failure / bad JSON \u2192 `processing_status = ai_failed` + `processing_error` (not retried automatically; set `processed=false` to retry).\nOutput feeds **04** and **05**.",
+        "height": 260,
+        "width": 600
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -480
+      ],
+      "id": "0b108d82-2ac2-41c2-839d-d69f8f19b502",
+      "name": "Note 1bde3b"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -100
+      ],
+      "id": "ab1fcb95-f3aa-4416-90c5-9c32f81c4d30",
+      "name": "Manual Run (testing)"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        100
+      ],
+      "id": "53aaf2cd-eaa3-43e9-bc10-023e82e409ca",
+      "name": "Every Hour"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "lyPPJZ6tVkwJ23CJ",
+          "mode": "list",
+          "cachedResultName": "research_papers",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/lyPPJZ6tVkwJ23CJ"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "processed",
+              "condition": "isFalse"
+            }
+          ]
+        },
+        "limit": 20
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        0
+      ],
+      "id": "eb58b14f-3186-4c1f-990e-0275f0af315b",
+      "name": "Get Unprocessed Papers"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a research assistant that summarizes academic papers for a researcher.\nResearch Topic: {{ $json.topic || $json.keywords }}\nPaper Title: {{ $json.title }}\nAuthors: {{ $json.authors }}\nAbstract: {{ $json.abstract }}\n\nUsing ONLY the information above, return ONLY valid JSON in exactly this format:\n{\n\"summary\": \"3-4 sentence plain-English summary\",\n\"key_findings\": [\"finding 1\", \"finding 2\"],\n\"methodology\": \"one sentence on the method/approach\",\n\"datasets\": [\"dataset names mentioned, else empty\"],\n\"models\": [\"model/architecture names mentioned, else empty\"],\n\"limitations\": [\"stated or evident limitations, else empty\"],\n\"research_gap\": \"one sentence\",\n\"research_significance\": \"one sentence on why it matters for the topic\",\n\"extracted_keywords\": [\"5-8 lowercase keywords\"],\n\"research_category\": \"one short category label, e.g. NLP, Computer Vision, Reinforcement Learning\"\n}\nRules:\n- Do not invent datasets, models or numbers that are not in the abstract.\n- Do not return Markdown.\n- Do not return any text outside the JSON object.",
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {
+          "batchSize": 5,
+          "delayBetweenBatches": 1000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        480,
+        0
+      ],
+      "id": "9c9f69d7-ed97-41f5-8fd9-d35fa3a23833",
+      "name": "Summarize Paper",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        480,
+        220
+      ],
+      "id": "6eb18ae8-a5d6-4451-931a-5d7805493eaf",
+      "name": "OpenAI Chat Model"
+    },
+    {
+      "parameters": {
+        "jsCode": "function parseLlmJson(text) {\n  const raw = String(text ?? '')\n    .replace(/^```(?:json)?\\s*/i, '')\n    .replace(/```\\s*$/, '')\n    .trim();\n  return JSON.parse(raw);\n}\n\n// Validate every AI summary before it is written to the Data Table.\nconst papers = $('Get Unprocessed Papers').all();\nconst asList = v => Array.isArray(v) ? v.map(String).filter(Boolean) : [];\nconst asText = v => (typeof v === 'string' && v.trim()) ? v.trim() : null;\n\nreturn $input.all().map((item, index) => {\n  const paper = papers[index]?.json || {};\n  let out;\n  try {\n    if (item.json.error) throw new Error('AI call failed: ' + (item.json.error.message || item.json.error));\n    const p = parseLlmJson(item.json.text);\n    const summary = asText(p.summary);\n    if (!summary) throw new Error('AI output has no summary');\n    out = {\n      ai_ok: true,\n      summary,\n      key_findings: JSON.stringify(asList(p.key_findings)),\n      methodology: asText(p.methodology),\n      datasets: JSON.stringify(asList(p.datasets)),\n      models: JSON.stringify(asList(p.models)),\n      limitations: JSON.stringify(asList(p.limitations)),\n      research_gap: asText(p.research_gap),\n      research_significance: asText(p.research_significance),\n      extracted_keywords: asList(p.extracted_keywords).map(k => k.toLowerCase()).join(', '),\n      research_category: asText(p.research_category) || 'Uncategorized',\n      processing_error: ''\n    };\n  } catch (e) {\n    out = { ai_ok: false, processing_error: String(e.message).slice(0, 500) };\n  }\n  return { json: { paper_id: paper.paper_id, title: paper.title, ...out } };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        0
+      ],
+      "id": "f8a43a70-7645-4d66-9365-55e20c1b51fa",
+      "name": "Validate AI Output"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "115b44c8-ff16-4f0e-9c95-5b5c9afb5ad8",
+              "leftValue": "={{ $json.ai_ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        980,
+        0
+      ],
+      "id": "bb3ac808-c876-4aef-9dcb-9cc27e64736d",
+      "name": "AI Output Valid?"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "lyPPJZ6tVkwJ23CJ",
+          "mode": "list",
+          "cachedResultName": "research_papers",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/lyPPJZ6tVkwJ23CJ"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "paper_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.paper_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "summary": "={{ $json.summary }}",
+            "key_findings": "={{ $json.key_findings }}",
+            "methodology": "={{ $json.methodology }}",
+            "datasets": "={{ $json.datasets }}",
+            "models": "={{ $json.models }}",
+            "limitations": "={{ $json.limitations }}",
+            "research_gap": "={{ $json.research_gap }}",
+            "research_significance": "={{ $json.research_significance }}",
+            "extracted_keywords": "={{ $json.extracted_keywords }}",
+            "research_category": "={{ $json.research_category }}",
+            "processed": true,
+            "processing_status": "summarized",
+            "processing_error": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "key_findings",
+              "displayName": "key_findings",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "methodology",
+              "displayName": "methodology",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "datasets",
+              "displayName": "datasets",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "models",
+              "displayName": "models",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "limitations",
+              "displayName": "limitations",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "research_gap",
+              "displayName": "research_gap",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "research_significance",
+              "displayName": "research_significance",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "extracted_keywords",
+              "displayName": "extracted_keywords",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "research_category",
+              "displayName": "research_category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "processed",
+              "displayName": "processed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "processing_status",
+              "displayName": "processing_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "processing_error",
+              "displayName": "processing_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1220,
+        -120
+      ],
+      "id": "8b37ddc9-9683-483e-903f-a8342c6290e9",
+      "name": "Save Summary"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "lyPPJZ6tVkwJ23CJ",
+          "mode": "list",
+          "cachedResultName": "research_papers",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/lyPPJZ6tVkwJ23CJ"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "paper_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.paper_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "processed": true,
+            "processing_status": "ai_failed",
+            "processing_error": "={{ $json.processing_error }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "processed",
+              "displayName": "processed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "processing_status",
+              "displayName": "processing_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "processing_error",
+              "displayName": "processing_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1220,
+        120
+      ],
+      "id": "a44b68b8-4237-4894-839e-8841e97f8faf",
+      "name": "Mark AI Failure"
+    },
+    {
+      "parameters": {
+        "jsCode": "const all = $input.all();\nconst ok = all.filter(i => i.json.ai_ok).length;\nconst failed = all.length - ok;\nreturn [{ json: {\n  workflow: $workflow.name,\n  event: 'papers_summarized',\n  level: failed ? 'warning' : 'info',\n  message: `${ok} paper(s) summarized, ${failed} AI failure(s)`,\n  details: { failed_papers: all.filter(i => !i.json.ai_ok).map(i => ({ paper_id: i.json.paper_id, error: i.json.processing_error })) },\n  execution_id: $execution.id\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        320
+      ],
+      "id": "f14319ef-d090-4e69-8e78-db704438d736",
+      "name": "Build Run Summary"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "KiRjquybEkOBf87E",
+          "mode": "list",
+          "cachedResultName": "06 - Error Handler & Audit Log",
+          "cachedResultUrl": "/workflow/KiRjquybEkOBf87E"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        320
+      ],
+      "id": "97e285b9-e57d-41df-ba75-a419ddf7c931",
+      "name": "Log to Audit Trail"
+    }
+  ],
+  "connections": {
+    "Manual Run (testing)": {
+      "main": [
+        [
+          {
+            "node": "Get Unprocessed Papers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Get Unprocessed Papers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Unprocessed Papers": {
+      "main": [
+        [
+          {
+            "node": "Summarize Paper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Paper": {
+      "main": [
+        [
+          {
+            "node": "Validate AI Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate AI Output": {
+      "main": [
+        [
+          {
+            "node": "AI Output Valid?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Run Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Summarize Paper",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Output Valid?": {
+      "main": [
+        [
+          {
+            "node": "Save Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark AI Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Run Summary": {
+      "main": [
+        [
+          {
+            "node": "Log to Audit Trail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "KiRjquybEkOBf87E"
+  }
+}

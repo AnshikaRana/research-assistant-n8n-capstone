@@ -1,0 +1,813 @@
+{
+  "name": "04 - Reference Management & Repository",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 04 · Reference Management & Repository\n**A. Archive (daily 10:00)** – papers with `processing_status = summarized` and `archived = false` → APA + BibTeX → download PDF → Google Drive → update `research_papers` (`pdf_status`: stored · no_link · download_failed · drive_upload_failed, `archived = true`). A broken PDF never stops the run. A `.bib` library file is uploaded per run.\n**B. Search API** – `GET /webhook/research/papers/search?q=…&topic_id=…` or `?paper_id=…` (related papers).\n**Credentials**: Google Drive.",
+        "height": 300,
+        "width": 700
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -700
+      ],
+      "id": "a07a4270-c596-4660-8d77-9d8783a0d539",
+      "name": "Note 10a30a"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -220
+      ],
+      "id": "99e61a47-4efe-4294-9207-b2a3b6c8f61d",
+      "name": "Manual Run (testing)"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -20
+      ],
+      "id": "1464f85d-d95d-435f-8074-8cfae5d8868b",
+      "name": "Daily 10:00"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "lyPPJZ6tVkwJ23CJ",
+          "mode": "list",
+          "cachedResultName": "research_papers",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/lyPPJZ6tVkwJ23CJ"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "processing_status",
+              "condition": "eq",
+              "keyValue": "summarized"
+            },
+            {
+              "keyName": "archived",
+              "condition": "isFalse"
+            }
+          ]
+        },
+        "limit": 25
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        -120
+      ],
+      "id": "6debe167-fbff-40bb-af90-0540ebe6d0c9",
+      "name": "Get Papers to Archive"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Deterministic reference formatting (APA 7 + BibTeX) for each summarized paper\nconst parseAuthors = a => {\n  if (Array.isArray(a)) return a;\n  try { const v = JSON.parse(a || '[]'); return Array.isArray(v) ? v : []; } catch { return a ? [String(a)] : []; }\n};\nconst apaName = full => {\n  const parts = String(full).trim().split(/\\s+/);\n  if (parts.length < 2) return parts[0] || '';\n  const last = parts.pop();\n  return `${last}, ${parts.map(p => p[0].toUpperCase() + '.').join(' ')}`;\n};\n\nreturn $input.all().map(({ json: p }) => {\n  const authors = parseAuthors(p.authors);\n  const year = p.publication_date ? new Date(p.publication_date).getFullYear() : 'n.d.';\n  const title = (p.title || 'Untitled').replace(/\\s+/g, ' ').trim();\n\n  let authorStr = authors.slice(0, 20).map(apaName);\n  authorStr = authorStr.length > 1\n    ? authorStr.slice(0, -1).join(', ') + ', & ' + authorStr.slice(-1)\n    : (authorStr[0] || 'Unknown author');\n\n  const venue = p.arxiv_id ? `arXiv preprint arXiv:${p.arxiv_id}` : (p.source === 'semantic_scholar' ? 'Semantic Scholar' : '');\n  const link = p.doi ? `https://doi.org/${p.doi}` : (p.url || '');\n  const citation_apa = `${authorStr} (${year}). ${title}. ${venue ? venue + '. ' : ''}${link}`.trim();\n\n  const firstLast = (String(authors[0] || 'unknown').trim().split(/\\s+/).pop() || 'unknown')\n    .toLowerCase().replace(/[^a-z]/g, '');\n  const firstWord = (title.toLowerCase().match(/[a-z]{4,}/) || ['paper'])[0];\n  const key = `${firstLast}${year}${firstWord}`;\n  const esc = s => String(s).replace(/[{}]/g, '');\n  const fields = [\n    `  title = {${esc(title)}}`,\n    `  author = {${esc(authors.join(' and ') || 'Unknown')}}`,\n    `  year = {${year}}`,\n    p.doi ? `  doi = {${p.doi}}` : null,\n    p.arxiv_id ? `  eprint = {${p.arxiv_id}},\\n  archivePrefix = {arXiv}` : null,\n    link ? `  url = {${link}}` : null,\n    p.extracted_keywords ? `  keywords = {${esc(p.extracted_keywords)}}` : null\n  ].filter(Boolean).join(',\\n');\n  const bibtex = `@${p.arxiv_id ? 'misc' : 'article'}{${key},\\n${fields}\\n}`;\n\n  return { json: {\n    paper_id: p.paper_id, topic_id: p.topic_id, title, pdf_url: p.pdf_url || '',\n    citation_apa, bibtex,\n    pdf_file_name: `${p.paper_id}_${firstLast}${year}.pdf`\n  }};\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        -120
+      ],
+      "id": "7c8abb45-f998-4893-9c62-6735bd9a4d15",
+      "name": "Build Citations"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0eb0fd3b-6781-4256-8ee5-c5eb59b743a8",
+              "leftValue": "={{ $json.pdf_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        680,
+        -120
+      ],
+      "id": "d18a048d-cdcd-4234-8c32-c5afd9f19ff2",
+      "name": "Has PDF Link?"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.pdf_url }}",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        -260
+      ],
+      "id": "ce7e4b0a-8eb5-4754-8c4a-4c7e118d3f67",
+      "name": "Download PDF",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "name": "={{ $json.pdf_file_name }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        -340
+      ],
+      "id": "add49312-e700-4bcb-9f4b-2d5aff43747c",
+      "name": "Upload PDF to Drive",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Attach the Drive outcome to each paper's reference (from \"Attach Reference\").\n// Item i of this branch maps to the paired input item, or to position i when the\n// whole Drive call failed (e.g. missing credential) and pairing info is absent.\nconst refs = $('Attach Reference').all().map(i => i.json);\nreturn $input.all().map((it, i) => {\n  const p = Array.isArray(it.pairedItem) ? it.pairedItem[0] : it.pairedItem;\n  const idx = (p && typeof p.item === 'number') ? p.item : i;\n  const ref = refs[idx] || refs[i] || {};\n  return { json: { ...ref, pdf_status: 'stored', drive_file_url: it.json.id ? `https://drive.google.com/file/d/${it.json.id}/view` : '', processing_error: '' } };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        -400
+      ],
+      "id": "a0036aa9-2cdd-4f28-9920-fddf3569a6b0",
+      "name": "Mark PDF Stored"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Attach the Drive outcome to each paper's reference (from \"Attach Reference\").\n// Item i of this branch maps to the paired input item, or to position i when the\n// whole Drive call failed (e.g. missing credential) and pairing info is absent.\nconst refs = $('Attach Reference').all().map(i => i.json);\nreturn $input.all().map((it, i) => {\n  const p = Array.isArray(it.pairedItem) ? it.pairedItem[0] : it.pairedItem;\n  const idx = (p && typeof p.item === 'number') ? p.item : i;\n  const ref = refs[idx] || refs[i] || {};\n  return { json: { ...ref, pdf_status: 'drive_upload_failed', drive_file_url: '', processing_error: 'Drive upload failed: ' + String(it.json.error?.message || it.json.error || 'unknown').split(' - ')[0].slice(0, 200) } };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        -240
+      ],
+      "id": "d54afca8-bac8-4153-b0fe-faed8b770d80",
+      "name": "Mark Drive Upload Failed"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Attach the PDF outcome to the reference built in \"Build Citations\"\nconst ref = $('Build Citations').item.json;\nreturn { json: {\n  ...ref,\n  pdf_status: 'download_failed',\n  drive_file_url: '',\n  processing_error: 'PDF download failed: ' + String($json.error?.message || $json.error || 'unknown').split(' - ')[0].slice(0, 200)\n} };",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        -100
+      ],
+      "id": "eeacf07e-0241-4b04-be2b-80622d8f24d1",
+      "name": "Mark PDF Unavailable"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Attach the PDF outcome to the reference built in \"Build Citations\"\nconst ref = $('Build Citations').item.json;\nreturn { json: {\n  ...ref,\n  pdf_status: 'no_link',\n  drive_file_url: '',\n  processing_error: ''\n} };",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        60
+      ],
+      "id": "a3134aa0-52d7-40cf-9249-621a7a0fc5d2",
+      "name": "Mark No PDF Link"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "lyPPJZ6tVkwJ23CJ",
+          "mode": "list",
+          "cachedResultName": "research_papers",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/lyPPJZ6tVkwJ23CJ"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "paper_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.paper_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "citation_apa": "={{ $json.citation_apa }}",
+            "bibtex": "={{ $json.bibtex }}",
+            "pdf_status": "={{ $json.pdf_status }}",
+            "drive_file_url": "={{ $json.drive_file_url }}",
+            "processing_error": "={{ $json.processing_error }}",
+            "archived": true
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "citation_apa",
+              "displayName": "citation_apa",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "bibtex",
+              "displayName": "bibtex",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "pdf_status",
+              "displayName": "pdf_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "drive_file_url",
+              "displayName": "drive_file_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "processing_error",
+              "displayName": "processing_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "archived",
+              "displayName": "archived",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        -160
+      ],
+      "id": "27194cbe-eeaa-4534-860e-7a404d00ddac",
+      "name": "Save Reference Record"
+    },
+    {
+      "parameters": {
+        "jsCode": "// One BibTeX library file per run, uploaded to Google Drive\nconst entries = $('Build Citations').all().map(i => i.json.bibtex);\nconst stamp = $now.toFormat('yyyy-LL-dd_HHmm');\nreturn [{ json: {\n  file_name: `research_library_${stamp}.bib`,\n  bib: `% AI Research Assistant – references added ${stamp}\\n\\n` + entries.join('\\n\\n') + '\\n',\n  references: entries.length\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        -520
+      ],
+      "id": "dd34e6bb-3d1a-45d7-b754-57b7885cbb92",
+      "name": "Build BibTeX Library"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "bib",
+        "options": {
+          "fileName": "={{ $json.file_name }}"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        -520
+      ],
+      "id": "38692df2-cf2c-453c-862f-3d6820b7f8ca",
+      "name": "Convert to .bib File"
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Build BibTeX Library').item.json.file_name }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        -520
+      ],
+      "id": "51e064f2-e8d0-4b7d-a078-c7bce154c284",
+      "name": "Upload Library to Drive",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $('Collect PDF Outcomes').all().map(i => i.json);\nconst tally = rows.reduce((t, r) => (t[r.pdf_status] = (t[r.pdf_status] || 0) + 1, t), {});\nreturn [{ json: {\n  workflow: $workflow.name,\n  event: 'references_archived',\n  level: (tally.download_failed || tally.drive_upload_failed) ? 'warning' : 'info',\n  message: `${rows.length} reference(s) archived`,\n  details: { pdf_status: tally },\n  execution_id: $execution.id\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1900,
+        -160
+      ],
+      "id": "c4e350f1-bec1-4882-9520-94096ee5acaf",
+      "name": "Build Run Summary"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "KiRjquybEkOBf87E",
+          "mode": "list",
+          "cachedResultName": "06 - Error Handler & Audit Log",
+          "cachedResultUrl": "/workflow/KiRjquybEkOBf87E"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2120,
+        -160
+      ],
+      "id": "0b62f3c8-405f-4130-9ea1-3c8d5a95be7e",
+      "name": "Log to Audit Trail"
+    },
+    {
+      "parameters": {
+        "path": "research/papers/search",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        360
+      ],
+      "id": "e5e4756e-0df5-4e7d-90e9-8cb9228b6075",
+      "name": "Search Request",
+      "webhookId": "4e19e825-a5fc-4452-9ad9-183ecf714e60"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "lyPPJZ6tVkwJ23CJ",
+          "mode": "list",
+          "cachedResultName": "research_papers",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/lyPPJZ6tVkwJ23CJ"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "processing_status",
+              "condition": "eq",
+              "keyValue": "summarized"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        360
+      ],
+      "id": "3b4e1f4c-e71a-46f7-99e7-a81fee7f1bf2",
+      "name": "Get Repository Papers",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Searchable repository + related-paper recommendation (deterministic keyword scoring)\n// GET /webhook/research/papers/search?q=...&topic_id=...&limit=10\n// GET /webhook/research/papers/search?paper_id=PAPER-...   -> related papers\nconst query = $('Search Request').first().json.query || {};\nconst rows = $input.all().map(i => i.json).filter(r => r.paper_id);\nconst limit = Math.min(Math.max(parseInt(query.limit || '10', 10) || 10, 1), 50);\n\nlet q = String(query.q || '').toLowerCase();\nlet exclude = null;\nif (query.paper_id) {\n  const base = rows.find(r => r.paper_id === query.paper_id);\n  if (!base) return [{ json: { status_code: 404, success: false, message: `paper_id ${query.paper_id} not found` } }];\n  q = `${base.extracted_keywords || ''} ${base.research_category || ''}`.toLowerCase();\n  exclude = base.paper_id;\n}\nconst terms = [...new Set(q.split(/[^a-z0-9]+/).filter(t => t.length > 2))];\nif (!terms.length) {\n  return [{ json: { status_code: 400, success: false, message: 'Provide ?q=<search terms> or ?paper_id=<id>' } }];\n}\n\nconst count = (text, t) => (String(text || '').toLowerCase().match(new RegExp(`\\\\b${t}`, 'g')) || []).length;\nconst results = rows\n  .filter(r => r.paper_id !== exclude)\n  .filter(r => !query.topic_id || r.topic_id === query.topic_id)\n  .map(r => {\n    const score = terms.reduce((s, t) =>\n      s + 3 * count(r.title, t) + 2 * count(r.extracted_keywords, t) + count(r.summary, t) + count(r.abstract, t), 0);\n    return { score, r };\n  })\n  .filter(x => x.score > 0)\n  .sort((a, b) => b.score - a.score || (b.r.relevance_score || 0) - (a.r.relevance_score || 0))\n  .slice(0, limit)\n  .map(({ score, r }) => ({\n    paper_id: r.paper_id, title: r.title, authors: r.authors, publication_date: r.publication_date,\n    topic_id: r.topic_id, category: r.research_category, keywords: r.extracted_keywords,\n    summary: r.summary, url: r.url, pdf_status: r.pdf_status, drive_file_url: r.drive_file_url,\n    citation_apa: r.citation_apa, relevance_score: r.relevance_score, match_score: score\n  }));\n\nreturn [{ json: {\n  status_code: 200, success: true,\n  mode: exclude ? 'related' : 'search', query: exclude ? { paper_id: exclude } : { q: query.q, topic_id: query.topic_id || null },\n  count: results.length, results\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        360
+      ],
+      "id": "272acc42-4d3f-49b5-9046-afcafce94bdc",
+      "name": "Search & Rank Papers"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": "={{ $json.status_code }}"
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        700,
+        360
+      ],
+      "id": "94b2ba39-08cc-4bdd-8e42-00473d14bf5d",
+      "name": "Respond with Results"
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1460,
+        -160
+      ],
+      "id": "b1c6c257-ac88-4fe1-a55e-d163346e645e",
+      "name": "Collect PDF Outcomes"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Carry the paper's reference fields together with the downloaded PDF,\n// so later steps never depend on paired-item lookups through Google Drive.\nreturn { json: { ...$('Build Citations').item.json }, binary: $input.item.binary };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1010,
+        -380
+      ],
+      "id": "a7c6a57c-bb70-4d5c-9b06-fa534dc0ab93",
+      "name": "Attach Reference"
+    }
+  ],
+  "connections": {
+    "Manual Run (testing)": {
+      "main": [
+        [
+          {
+            "node": "Get Papers to Archive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 10:00": {
+      "main": [
+        [
+          {
+            "node": "Get Papers to Archive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Papers to Archive": {
+      "main": [
+        [
+          {
+            "node": "Build Citations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Citations": {
+      "main": [
+        [
+          {
+            "node": "Has PDF Link?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build BibTeX Library",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has PDF Link?": {
+      "main": [
+        [
+          {
+            "node": "Download PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark No PDF Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download PDF": {
+      "main": [
+        [
+          {
+            "node": "Attach Reference",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark PDF Unavailable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload PDF to Drive": {
+      "main": [
+        [
+          {
+            "node": "Mark PDF Stored",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Drive Upload Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark PDF Stored": {
+      "main": [
+        [
+          {
+            "node": "Collect PDF Outcomes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Drive Upload Failed": {
+      "main": [
+        [
+          {
+            "node": "Collect PDF Outcomes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Mark PDF Unavailable": {
+      "main": [
+        [
+          {
+            "node": "Collect PDF Outcomes",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Mark No PDF Link": {
+      "main": [
+        [
+          {
+            "node": "Collect PDF Outcomes",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Collect PDF Outcomes": {
+      "main": [
+        [
+          {
+            "node": "Save Reference Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Reference Record": {
+      "main": [
+        [
+          {
+            "node": "Build Run Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Run Summary": {
+      "main": [
+        [
+          {
+            "node": "Log to Audit Trail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build BibTeX Library": {
+      "main": [
+        [
+          {
+            "node": "Convert to .bib File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to .bib File": {
+      "main": [
+        [
+          {
+            "node": "Upload Library to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Request": {
+      "main": [
+        [
+          {
+            "node": "Get Repository Papers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Repository Papers": {
+      "main": [
+        [
+          {
+            "node": "Search & Rank Papers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search & Rank Papers": {
+      "main": [
+        [
+          {
+            "node": "Respond with Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Reference": {
+      "main": [
+        [
+          {
+            "node": "Upload PDF to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "KiRjquybEkOBf87E"
+  }
+}

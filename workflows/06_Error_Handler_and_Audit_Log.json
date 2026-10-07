@@ -1,0 +1,336 @@
+{
+  "name": "06 - Error Handler & Audit Log",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 06 \u00b7 Error Handler & Audit Log\n**Two entry points**\n1. *Error Trigger* \u2013 set as the Error Workflow of 01\u201305; any failed execution lands here.\n2. *When Called by Another Workflow* \u2013 01\u201305 send run events here.\n\n**Input contract** (sub-workflow): `workflow`, `event`, `level` (info|warning|error), `message`, `details`, `execution_id`.\n**Output**: one row per event in Data Table `audit_log`; `error` level also emails the admin.",
+        "height": 300,
+        "width": 520
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -420
+      ],
+      "id": "c5fb8fac-5226-4dd5-928f-16c030173d3c",
+      "name": "Note ad2b85"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "65a56135-50cb-4e73-ad9d-772801da0ba0",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalise n8n's Error Trigger payload into the audit-log contract\nconst e = $json.execution || {};\nconst wf = $json.workflow || {};\nconst err = e.error || $json.trigger?.error || {};\nreturn [{ json: {\n  workflow: wf.name || 'unknown workflow',\n  event: 'workflow_error',\n  level: 'error',\n  message: err.message || 'Unknown error',\n  details: JSON.stringify({\n    failed_node: e.lastNodeExecuted || err.node?.name || null,\n    mode: e.mode || null,\n    description: err.description || null,\n    stack: (err.stack || '').split('\\n').slice(0, 5).join('\\n')\n  }),\n  execution_id: e.id ? String(e.id) : '',\n  execution_url: e.url || ''\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "ba71a3e4-ffb1-431b-a209-15016a0fdcf6",
+      "name": "Format Error Event"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        220
+      ],
+      "id": "571dafdf-5355-4a77-a2fb-0c36dbe40db9",
+      "name": "When Called by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate events sent by workflows 01\u201305; never throw so logging can't break callers\nconst LEVELS = ['info', 'warning', 'error'];\nreturn $input.all().map(({ json: j }) => ({ json: {\n  workflow: String(j.workflow || 'unknown workflow'),\n  event: String(j.event || 'event'),\n  level: LEVELS.includes(j.level) ? j.level : 'info',\n  message: String(j.message ?? '').slice(0, 1000),\n  details: typeof j.details === 'string' ? j.details : JSON.stringify(j.details ?? {}),\n  execution_id: j.execution_id != null ? String(j.execution_id) : '',\n  execution_url: j.execution_url || ''\n}}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        220
+      ],
+      "id": "88fc0650-455b-45fc-bfd9-20454078a26b",
+      "name": "Normalize Log Event"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "byw3xWmNdUzaj8nO",
+          "mode": "list",
+          "cachedResultName": "audit_log",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/byw3xWmNdUzaj8nO"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "log_id": "={{ 'LOG-' + $now.toMillis() + '-' + $itemIndex }}",
+            "workflow": "={{ $json.workflow }}",
+            "event": "={{ $json.event }}",
+            "level": "={{ $json.level }}",
+            "message": "={{ $json.message }}",
+            "details": "={{ $json.details }}",
+            "execution_id": "={{ $json.execution_id }}",
+            "execution_url": "={{ $json.execution_url }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "log_id",
+              "displayName": "log_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "event",
+              "displayName": "event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "level",
+              "displayName": "level",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "execution_url",
+              "displayName": "execution_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        460,
+        100
+      ],
+      "id": "0b742e5b-393e-4b8e-a01b-d0dfe6f6810a",
+      "name": "Write Audit Log"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4db7ee64-3f06-4fff-9359-de003555debe",
+              "leftValue": "={{ $json.level }}",
+              "rightValue": "error",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        680,
+        100
+      ],
+      "id": "0e17c8c5-247b-4157-8f90-ad6bc2a29972",
+      "name": "Is Error?"
+    },
+    {
+      "parameters": {
+        "sendTo": "photos2.anshikarana@gmail.com",
+        "subject": "=\u26a0\ufe0f n8n Research Assistant \u2013 failure in {{ $json.workflow }}",
+        "emailType": "html",
+        "message": "=<h3>Workflow failure</h3><p><b>Workflow:</b> {{ $json.workflow }}<br><b>Event:</b> {{ $json.event }}<br><b>Message:</b> {{ $json.message }}<br><b>Execution:</b> {{ $json.execution_id }} {{ $json.execution_url }}</p><pre>{{ $json.details }}</pre>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        900,
+        0
+      ],
+      "id": "7ad42ba6-821e-4a13-a355-3669bb77409c",
+      "name": "Email Alert to Admin",
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "disabled": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        900,
+        200
+      ],
+      "id": "e9899891-71e6-46c3-ac65-87f80e75ca8b",
+      "name": "No Alert Needed"
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Error Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Event": {
+      "main": [
+        [
+          {
+            "node": "Write Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Normalize Log Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Log Event": {
+      "main": [
+        [
+          {
+            "node": "Write Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Audit Log": {
+      "main": [
+        [
+          {
+            "node": "Is Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Error?": {
+      "main": [
+        [
+          {
+            "node": "Email Alert to Admin",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Alert Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

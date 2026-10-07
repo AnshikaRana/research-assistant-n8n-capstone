@@ -1,0 +1,1111 @@
+{
+  "name": "02 - Paper Search & Collection",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 02 \u00b7 Research Paper Search & Collection\nDaily 08:00 \u2192 every **active** topic in `research_topics` \u2192 arXiv + Semantic Scholar \u2192 dedupe (arXiv ID \u2192 DOI \u2192 title+year, per topic, merging metadata) \u2192 skip papers already stored \u2192 LLM relevance (\u2265 0.70) \u2192 insert into `research_papers` with `processed=false`, `processing_status=pending_ai`.\nAPI failures are retried 3\u00d7 then treated as zero results.\n**Credentials**: OpenAI \u00b7 Semantic Scholar (Header Auth `x-api-key`).",
+        "height": 260,
+        "width": 620
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        60,
+        -620
+      ],
+      "id": "ac67e75a-2352-44c4-b44f-c07c5a765b7c",
+      "name": "Note 3d3850"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        80,
+        0
+      ],
+      "id": "5181d21c-5ab1-4e5e-a3b1-a66738bca186",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "EZzcbjllTAxkF1oL",
+          "mode": "list",
+          "cachedResultName": "research_topics",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/EZzcbjllTAxkF1oL"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "465ce244-bfdf-4993-be48-6c2c66608615",
+      "name": "Get row(s)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3b969a60-b4e9-435e-96e1-3f0d63d8a053",
+              "leftValue": "={{$json.active}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        352,
+        0
+      ],
+      "id": "3517151f-b27f-4001-b2d4-87f950e5e91c",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const topic = item.json.topic?.trim() || \"\";\n\n  return {\n    json: {\n      ...item.json,\n      search_query: topic\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        -80
+      ],
+      "id": "c6f2d1cd-5945-4d89-b4a8-58eed6070919",
+      "name": "Build Search Query"
+    },
+    {
+      "parameters": {
+        "url": "https://export.arxiv.org/api/query",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "search_query",
+              "value": "=all:\"{{$json.search_query}}\""
+            },
+            {
+              "name": "start",
+              "value": "0"
+            },
+            {
+              "name": "max_results",
+              "value": "20"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 3000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        752,
+        -16
+      ],
+      "id": "04369251-6ae3-4285-b961-450ca5eb68f2",
+      "name": "Search arXiv",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\n\n// Get the original topic data directly from Build Search Query\nconst topicItems = $('Build Search Query').all();\nconst inputItems = $input.all();\n\nconst clean = s => (s || '').replace(/\\s+/g, ' ').trim() || null;\n\nfor (let index = 0; index < inputItems.length; index++) {\n  const item = inputItems[index];\n  // A failed request (retries exhausted) arrives here as an item with `error`:\n  // treat it as zero results so one bad topic does not stop the run.\n  const xml = typeof item.json.data === 'string' ? item.json.data : '';\n\n  // Match this arXiv response to the corresponding topic by item position.\n  const topic = topicItems[index]?.json || {};\n\n  const entries = xml.match(/<entry>[\\s\\S]*?<\\/entry>/g) || [];\n\n  for (const entry of entries) {\n    const getTag = (tag) => {\n      const match = entry.match(\n        new RegExp(`<${tag}[^>]*>([\\\\s\\\\S]*?)<\\\\/${tag}>`)\n      );\n      return match ? match[1].trim() : null;\n    };\n\n    const id = getTag(\"id\");\n\n    const authors = [...entry.matchAll(\n      /<author>[\\s\\S]*?<name>(.*?)<\\/name>[\\s\\S]*?<\\/author>/g\n    )].map(match => match[1].trim());\n\n    const arxivId = id\n      ? id.match(/abs\\/(.+?)(?:v\\d+)?$/)?.[1] || null\n      : null;\n\n    // arXiv exposes the PDF as <link title=\"pdf\" href=\"...\"/>\n    const pdfLink = [...entry.matchAll(/<link\\b[^>]*>/g)]\n      .map(m => m[0])\n      .find(tag => /title=\"pdf\"/.test(tag));\n    const pdfUrl = pdfLink?.match(/href=\"([^\"]+)\"/)?.[1]?.replace('http://', 'https://') || null;\n\n    const published = getTag(\"published\");\n    const updated = getTag(\"updated\");\n\n    results.push({\n      json: {\n        topic_id: topic.topic_id,\n        topic: topic.topic,\n        keywords: topic.keywords,\n        researcher: topic.researcher,\n\n        arxiv_id: arxivId,\n        title: clean(getTag(\"title\")),\n        abstract: clean(getTag(\"summary\")),\n\n        // Preserve publication metadata\n        published: published,\n        updated: updated,\n        publication_date: published || updated || null,\n\n        doi: getTag(\"arxiv:doi\"),\n        authors,\n        url: id ? id.replace(\"http://\", \"https://\") : null,\n        pdf_url: pdfUrl\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        -16
+      ],
+      "id": "41ffcf93-0c8e-4969-9bfd-3083ff23aa9c",
+      "name": "Parse arXiv Results"
+    },
+    {
+      "parameters": {
+        "url": "https://api.semanticscholar.org/graph/v1/paper/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "={{$json.search_query}}"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            },
+            {
+              "name": "fields",
+              "value": "title,abstract,authors,year,url,externalIds,publicationDate,openAccessPdf"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 5,
+              "batchInterval": 3000
+            }
+          },
+          "timeout": 30000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        752,
+        -240
+      ],
+      "id": "6355ec6e-c12f-4918-8d81-f8370c35ada0",
+      "name": "Search Semantic Scholar",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\n\nconst topicItems = $('Build Search Query').all();\nconst inputItems = $input.all();\n\nfor (let i = 0; i < inputItems.length; i++) {\n  const item = inputItems[i];\n  // Failed / rate-limited request -> item has `error` and no data -> zero results\n  const papers = Array.isArray(item.json.data) ? item.json.data : [];\n\n  // This API response corresponds to the topic at the same input index.\n  const topic = topicItems[i]?.json || {};\n\n  for (const paper of papers) {\n    results.push({\n      json: {\n        topic_id: topic.topic_id,\n        topic: topic.topic,\n        keywords: topic.keywords,\n        researcher: topic.researcher,\n\n        paper_id_external: paper.paperId,\n        title: paper.title || null,\n        abstract: paper.abstract || null,\n        year: paper.year || null,\n        publication_date: paper.publicationDate || null,\n\n        authors: (paper.authors || []).map(a => a.name),\n\n        url: paper.url || null,\n        pdf_url: paper.openAccessPdf?.url || null,\n\n        arxiv_id: paper.externalIds?.ArXiv || null,\n        doi: paper.externalIds?.DOI || null\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        -240
+      ],
+      "id": "b51dcc8e-67d0-42bd-822f-19b6be61ee7e",
+      "name": "Parse Semantic Scholar Results"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const p = item.json;\n\n  let dedupe_key;\n\n  // Prefer arXiv ID because both sources commonly expose it.\n  if (p.arxiv_id) {\n    dedupe_key = `arxiv:${p.arxiv_id.toLowerCase().trim()}`;\n  }\n  // Fall back to DOI.\n  else if (p.doi) {\n    dedupe_key = `doi:${p.doi.toLowerCase().trim()}`;\n  }\n  // Final fallback: normalized title + year.\n  else {\n    const title = (p.title || \"\")\n      .toLowerCase()\n      .replace(/[^\\w\\s]/g, \"\")\n      .replace(/\\s+/g, \" \")\n      .trim();\n\n    dedupe_key = `title:${title}|year:${p.year || \"\"}`;\n  }\n\n  return {\n    json: {\n      ...p,\n      dedupe_key\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        -240
+      ],
+      "id": "0d103908-5bb2-4dba-b64e-926eb9a64a59",
+      "name": "Generate Dedupe Key - Semantic Scholar"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const p = item.json;\n\n  let dedupe_key;\n\n  // Prefer arXiv ID because both sources commonly expose it.\n  if (p.arxiv_id) {\n    dedupe_key = `arxiv:${p.arxiv_id.toLowerCase().trim()}`;\n  }\n  // Fall back to DOI.\n  else if (p.doi) {\n    dedupe_key = `doi:${p.doi.toLowerCase().trim()}`;\n  }\n  // Final fallback: normalized title + year.\n  else {\n    const title = (p.title || \"\")\n      .toLowerCase()\n      .replace(/[^\\w\\s]/g, \"\")\n      .replace(/\\s+/g, \" \")\n      .trim();\n\n    dedupe_key = `title:${title}|year:${p.year || \"\"}`;\n  }\n\n  return {\n    json: {\n      ...p,\n      dedupe_key\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        -16
+      ],
+      "id": "eb0ac5b3-1477-49da-9b17-6bb55279c281",
+      "name": "Generate Dedupe Key - arXiv"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Remove duplicates inside the arXiv result set (per topic: the same\n// paper may legitimately be stored for two different topics)\nconst seen = new Set();\nconst results = [];\n\nfor (const item of $input.all()) {\n  const key = `${item.json.topic_id}::${item.json.dedupe_key}`;\n\n  if (!seen.has(key)) {\n    seen.add(key);\n    results.push(item);\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        -16
+      ],
+      "id": "10288b32-0f3a-4367-bbb1-6223adb8d807",
+      "name": "Remove Duplicates"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1568,
+        -144
+      ],
+      "id": "1f5803cb-cada-4aa6-b1dc-b5992c1e189a",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Cross-source de-duplication (per topic). When the same paper comes from\n// Semantic Scholar AND arXiv, keep one record but fill any empty field\n// from the other source so good metadata is never replaced by null.\nconst isEmpty = v => v === null || v === undefined || v === '' ||\n  (Array.isArray(v) && v.length === 0);\n\nconst byKey = new Map();\nconst results = [];\n\nfor (const item of $input.all()) {\n  const key = item.json.dedupe_key\n    ? `${item.json.topic_id}::${item.json.dedupe_key}`\n    : null;\n\n  if (!key) {\n    results.push(item);\n    continue;\n  }\n\n  if (!byKey.has(key)) {\n    const copy = { json: { ...item.json } };\n    byKey.set(key, copy);\n    results.push(copy);\n  } else {\n    const kept = byKey.get(key).json;\n    for (const [field, value] of Object.entries(item.json)) {\n      if (isEmpty(kept[field]) && !isEmpty(value)) kept[field] = value;\n    }\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -144
+      ],
+      "id": "230d94d6-04ca-4f10-a319-7638816bb18a",
+      "name": "Remove Cross-Source Duplicates"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item, index) => {\n  const p = item.json;\n\n  const year =\n    p.year ??\n    (p.published ? new Date(p.published).getFullYear() : null) ??\n    (p.publication_date\n      ? new Date(p.publication_date).getFullYear()\n      : null);\n\n  const publication_date =\n    p.publication_date ||\n    p.published ||\n    p.updated ||\n    null;\n\n  return {\n    json: {\n      paper_id: `PAPER-${Date.now()}-${index + 1}`,\n\n      title: p.title || null,\n      authors: Array.isArray(p.authors) ? p.authors : [],\n      abstract: p.abstract || null,\n\n      year: year,\n      publication_date: publication_date,\n\n      doi: p.doi || null,\n      arxiv_id: p.arxiv_id || null,\n      url: p.url || null,\n\n      // PDF link known != PDF downloaded. 04 downloads it and updates pdf_status.\n      pdf_url: p.pdf_url || null,\n      pdf_status: p.pdf_url ? 'link_found' : 'no_link',\n\n      source: p.paper_id_external ? \"semantic_scholar\" : \"arxiv\",\n\n      topic_id: p.topic_id || null,\n      topic: p.topic || null,\n      keywords: p.keywords || null,\n      researcher: p.researcher || null,\n\n      dedupe_key: p.dedupe_key || null,\n\n      summary: null,\n      key_findings: [],\n      methodology: null,\n      datasets: [],\n      models: [],\n      limitations: [],\n      research_gap: null,\n      research_significance: null,\n\n      relevance_score: null,\n      relevant: null,\n      processed: false,\n\n      created_at: new Date().toISOString()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1952,
+        -144
+      ],
+      "id": "919bfc8b-b622-4a08-824a-ddcb3e2cd08b",
+      "name": "Normalize Paper Metadata"
+    },
+    {
+      "parameters": {
+        "operation": "rowNotExists",
+        "dataTableId": {
+          "__rl": true,
+          "value": "lyPPJZ6tVkwJ23CJ",
+          "mode": "list",
+          "cachedResultName": "research_papers",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/lyPPJZ6tVkwJ23CJ"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "topic_id",
+              "keyValue": "={{ $json.topic_id }}"
+            },
+            {
+              "keyName": "dedupe_key",
+              "keyValue": "={{ $json.dedupe_key }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2144,
+        -144
+      ],
+      "id": "3feb2661-7a56-43dd-b236-f4a48dc7be85",
+      "name": "Skip Already Stored Papers"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a research-paper relevance classifier.\nDetermine how relevant the following paper is to the researcher's registered research topic.\nResearch Topic: {{$json.topic}}\nResearch Keywords: {{$json.keywords}}\nPaper Title: {{$json.title}}\nPaper Abstract: {{$json.abstract}}\nReturn ONLY valid JSON in exactly this format:  \n{\n\"relevant\": true,\n\"relevance_score\": 0.92,\n\"reason\": \"Brief explanation of why the paper is or is not relevant.\" \n}\nRules: \n- relevance_score must be between 0 and 1. \n- relevant must be true when relevance_score >= 0.70. \n- relevant must be false when relevance_score < 0.70. \n- Do not return Markdown. \n- Do not return any text outside the JSON object.",
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {
+          "batchSize": 5,
+          "delayBetweenBatches": 1000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        2352,
+        -144
+      ],
+      "id": "182edf40-c3a2-411d-af93-17998528071d",
+      "name": "Basic LLM Chain",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini",
+          "cachedResultName": "gpt-5-mini",
+          "cachedResultUrl": ""
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        2360,
+        64
+      ],
+      "id": "28def601-07c1-4059-b153-77d7a7a75a77",
+      "name": "OpenAI Chat Model"
+    },
+    {
+      "parameters": {
+        "jsCode": "// LLM output is untrusted: strip code fences, parse, validate, and decide\n// relevance deterministically from the score (>= 0.70, as the prompt defines).\nconst originalItems = $('Skip Already Stored Papers').all();\nconst llmItems = $input.all();\n\nreturn llmItems.map((item, index) => {\n  const raw = String(item.json.text ?? '')\n    .replace(/^```(?:json)?\\s*/i, '')\n    .replace(/```\\s*$/, '')\n    .trim();\n  const original = originalItems[index]?.json || {};\n\n  let parsed = null;\n  let aiError = null;\n\n  try {\n    parsed = JSON.parse(raw);\n  } catch (error) {\n    aiError = item.json.error ? 'AI relevance call failed' : 'AI returned invalid JSON';\n  }\n\n  let score = Number(parsed?.relevance_score);\n  if (!aiError && (!Number.isFinite(score) || score < 0 || score > 1)) {\n    aiError = 'AI returned an out-of-range relevance_score';\n  }\n  if (aiError) score = 0;\n\n  return {\n    json: {\n      ...original,\n\n      relevant: score >= 0.7,\n      relevance_score: score,\n      relevance_reason: aiError || String(parsed.reason || '')\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        -144
+      ],
+      "id": "37b46944-423d-4699-882c-f2b1f6b64f66",
+      "name": "Parse Relevance Result"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "291c78f0-c4ab-45fe-a324-eb796f384f28",
+              "leftValue": "={{$json.relevance_score}}",
+              "rightValue": 0.7,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2820,
+        -144
+      ],
+      "id": "fb1ac23b-c444-4600-a636-67844fc06a2a",
+      "name": "Is Relevant?"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "lyPPJZ6tVkwJ23CJ",
+          "mode": "list",
+          "cachedResultName": "research_papers",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/lyPPJZ6tVkwJ23CJ"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "relevant": true,
+            "processed": false,
+            "paper_id": "={{$json.paper_id}}",
+            "topic_id": "={{$json.topic_id}}",
+            "title": "={{$json.title}}",
+            "authors": "={{JSON.stringify($json.authors)}}",
+            "abstract": "={{$json.abstract}}",
+            "source": "={{$json.source}}",
+            "doi": "={{$json.doi}}",
+            "arxiv_id": "={{$json.arxiv_id}}",
+            "url": "={{$json.url}}",
+            "publication_date": "={{$json.publication_date}}",
+            "relevance_score": "={{$json.relevance_score}}",
+            "summary": "={{$json.summary}}",
+            "key_findings": "={{JSON.stringify($json.key_findings)}}",
+            "methodology": "={{$json.methodology}}",
+            "datasets": "={{JSON.stringify($json.datasets)}}",
+            "models": "={{JSON.stringify($json.models)}}",
+            "keywords": "={{$json.keywords}}",
+            "limitations": "={{JSON.stringify($json.limitations)}}",
+            "research_gap": "={{$json.research_gap}}",
+            "research_significance": "={{$json.research_significance}}",
+            "researcher": "={{$json.researcher}}",
+            "dedupe_key": "={{$json.dedupe_key}}",
+            "pdf_url": "={{ $json.pdf_url }}",
+            "pdf_status": "={{ $json.pdf_status }}",
+            "processing_status": "pending_ai",
+            "archived": false,
+            "digested": false
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "relevant",
+              "displayName": "relevant",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "processed",
+              "displayName": "processed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "paper_id",
+              "displayName": "paper_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic_id",
+              "displayName": "topic_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "authors",
+              "displayName": "authors",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "abstract",
+              "displayName": "abstract",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "doi",
+              "displayName": "doi",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "arxiv_id",
+              "displayName": "arxiv_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "url",
+              "displayName": "url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "publication_date",
+              "displayName": "publication_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "relevance_score",
+              "displayName": "relevance_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "key_findings",
+              "displayName": "key_findings",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "methodology",
+              "displayName": "methodology",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "datasets",
+              "displayName": "datasets",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "models",
+              "displayName": "models",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "keywords",
+              "displayName": "keywords",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "limitations",
+              "displayName": "limitations",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "research_gap",
+              "displayName": "research_gap",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "research_significance",
+              "displayName": "research_significance",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "researcher",
+              "displayName": "researcher",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "dedupe_key",
+              "displayName": "dedupe_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "pdf_url",
+              "displayName": "pdf_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "pdf_status",
+              "displayName": "pdf_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "processing_status",
+              "displayName": "processing_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "archived",
+              "displayName": "archived",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "digested",
+              "displayName": "digested",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3060,
+        -260
+      ],
+      "id": "070b4484-8bf1-4b7e-9e52-1b8801fe9d07",
+      "name": "Insert row"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => ({\n  json: {\n    paper_id: item.json.paper_id,\n    topic_id: item.json.topic_id,\n    title: item.json.title,\n    relevance_score: item.json.relevance_score,\n    relevant: false,\n    reason: item.json.relevance_reason || null,\n    filtered_at: new Date().toISOString()\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3060,
+        -40
+      ],
+      "id": "890065a1-38da-46f2-a8b0-4d03db893b67",
+      "name": "Log Filtered Paper"
+    },
+    {
+      "parameters": {
+        "jsCode": "// One audit event per run for workflow 06 (warning if the AI step failed)\nconst ran = n => { try { return $(n).all(); } catch { return []; } };\nconst saved = ran('Insert row').length;\nconst filtered = ran('Log Filtered Paper');\nconst aiFailures = filtered.filter(i => String(i.json.reason || '').startsWith('AI ')).length;\nreturn [{ json: {\n  workflow: $workflow.name,\n  event: 'papers_collected',\n  level: aiFailures ? 'warning' : 'info',\n  message: `${saved} relevant new paper(s) saved, ${filtered.length} filtered out` +\n           (aiFailures ? ` (${aiFailures} because the AI relevance check failed)` : ''),\n  details: {\n    topics_searched: $('Build Search Query').all().length,\n    candidates_after_dedupe: $('Normalize Paper Metadata').all().length,\n    new_candidates: $('Skip Already Stored Papers').all().length,\n    saved, filtered: filtered.length, ai_failures: aiFailures\n  },\n  execution_id: $execution.id\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3500,
+        -144
+      ],
+      "id": "3dbf6a17-059d-48e4-9fd7-d2fe6203388a",
+      "name": "Build Run Summary"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "KiRjquybEkOBf87E",
+          "mode": "list",
+          "cachedResultName": "06 - Error Handler & Audit Log",
+          "cachedResultUrl": "/workflow/KiRjquybEkOBf87E"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3720,
+        -144
+      ],
+      "id": "d5a4155b-c61c-4326-88a3-6c020122f5d6",
+      "name": "Log to Audit Trail"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3280,
+        -144
+      ],
+      "id": "6176e418-501f-4edb-85bb-904543f71142",
+      "name": "Collect Results"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s)": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Build Search Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Search Query": {
+      "main": [
+        [
+          {
+            "node": "Search arXiv",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Search Semantic Scholar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search arXiv": {
+      "main": [
+        [
+          {
+            "node": "Parse arXiv Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse arXiv Results": {
+      "main": [
+        [
+          {
+            "node": "Generate Dedupe Key - arXiv",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Dedupe Key - arXiv": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Search Semantic Scholar": {
+      "main": [
+        [
+          {
+            "node": "Parse Semantic Scholar Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Semantic Scholar Results": {
+      "main": [
+        [
+          {
+            "node": "Generate Dedupe Key - Semantic Scholar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Dedupe Key - Semantic Scholar": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Remove Cross-Source Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Cross-Source Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Normalize Paper Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Paper Metadata": {
+      "main": [
+        [
+          {
+            "node": "Skip Already Stored Papers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Already Stored Papers": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Parse Relevance Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Relevance Result": {
+      "main": [
+        [
+          {
+            "node": "Is Relevant?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Relevant?": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Filtered Paper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert row": {
+      "main": [
+        [
+          {
+            "node": "Collect Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Filtered Paper": {
+      "main": [
+        [
+          {
+            "node": "Collect Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Collect Results": {
+      "main": [
+        [
+          {
+            "node": "Build Run Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Run Summary": {
+      "main": [
+        [
+          {
+            "node": "Log to Audit Trail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "KiRjquybEkOBf87E"
+  }
+}

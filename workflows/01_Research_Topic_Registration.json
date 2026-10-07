@@ -1,0 +1,481 @@
+{
+  "name": "01 - Research Topic Registration",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 01 \u00b7 Research Topic Registration (API)\n`POST /webhook/research/topic`\n```json\n{\"researcher\":\"\u2026\",\"email\":\"\u2026\",\"topic\":\"\u2026\",\n \"keywords\":\"a, b\" | [\"a\",\"b\"],\"frequency\":\"daily|weekly|monthly\"}\n```\n**Responses**: 200 registered (`topic_id`) \u00b7 400 validation errors \u00b7 409 duplicate.\nDuplicate key = `email | lower(topic)` \u2192 idempotent.\nWrites `research_topics` (active=true) \u2192 picked up by **02**.",
+        "height": 300,
+        "width": 560
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        100,
+        -560
+      ],
+      "id": "61942704-0920-47db-80ce-5c65be769f26",
+      "name": "Note 79a94f"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "research/topic",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "0f221b61-b558-475c-ba92-6f1ae65a6c8d",
+      "name": "Webhook",
+      "webhookId": "f19782c7-6861-4627-9124-1e0dc818eacb"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = { ...($json.body || $json) };\n\nif (typeof data.keywords === 'string') {\n  data.keywords = data.keywords\n    .split(',')\n    .map(k => k.trim())\n    .filter(Boolean);\n}\n\nconst errors = [];\n\n// Validate researcher\nif (\n  !data.researcher ||\n  typeof data.researcher !== 'string' ||\n  data.researcher.trim() === ''\n) {\n  errors.push('researcher is required');\n}\n\n// Validate email\nif (\n  !data.email ||\n  typeof data.email !== 'string' ||\n  !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(data.email.trim())\n) {\n  errors.push('valid email is required');\n}\n\n// Validate topic\nif (\n  !data.topic ||\n  typeof data.topic !== 'string' ||\n  data.topic.trim().length < 3\n) {\n  errors.push('topic is required (min 3 characters)');\n}\n\n// Validate keywords\nif (\n  !Array.isArray(data.keywords) ||\n  data.keywords.length === 0\n) {\n  errors.push('keywords must contain at least one item');\n}\n\n// Validate frequency\nconst frequency = String(data.frequency || 'weekly').toLowerCase();\n\nif (!['daily', 'weekly', 'monthly'].includes(frequency)) {\n  errors.push('frequency must be daily, weekly, or monthly');\n}\n\nreturn {\n  json: {\n    ...data,\n    frequency,\n    valid: errors.length === 0,\n    errors\n  }\n};",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "a5772d89-22af-4db4-b1b6-c92a317b6b59",
+      "name": "Validate Input"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1a8b9393-2702-4229-988e-99f1ee3d67ea",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        0
+      ],
+      "id": "449d16ab-e6eb-42da-a031-0745deef6f04",
+      "name": "Valid Input?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{\n  {\n    success: false,\n    message: \"Invalid research topic registration request\",\n    errors: $json.errors\n  }\n}}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        880,
+        160
+      ],
+      "id": "a3ed240b-faa5-467d-aad7-c4a572e6ebdd",
+      "name": "Validation Error Response"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json;\n\nconst topicId =\n  `TOPIC-${Date.now()}-${Math.random()\n    .toString(36)\n    .substring(2, 7)\n    .toUpperCase()}`;\n\nconst keywords = [...new Set(data.keywords\n  .map(k => String(k).trim().toLowerCase())\n  .filter(Boolean))]\n  .join(', ');\n\nconst email = data.email.trim().toLowerCase();\n// collapse whitespace so \"LLM  agents\" and \"LLM agents\" are the same topic\nconst topic = data.topic.trim().replace(/\\s+/g, ' ');\n\nreturn {\n  json: {\n    topic_id: topicId,\n    researcher: data.researcher.trim(),\n    email,\n    topic,\n    // case-insensitive duplicate key: one researcher (email) cannot register the same topic twice\n    topic_key: `${email}|${topic.toLowerCase()}`,\n    keywords,\n    frequency: data.frequency || 'weekly',\n    active: true\n  }\n};",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        -128
+      ],
+      "id": "60057ab6-e377-468e-9187-7269739cc34d",
+      "name": "Generate Topic Record"
+    },
+    {
+      "parameters": {
+        "operation": "rowExists",
+        "dataTableId": {
+          "__rl": true,
+          "value": "EZzcbjllTAxkF1oL",
+          "mode": "list",
+          "cachedResultName": "research_topics",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/EZzcbjllTAxkF1oL"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "topic_key",
+              "keyValue": "={{ $json.topic_key }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        -240
+      ],
+      "id": "74abd9ff-6764-4176-8fbf-764a2f28dc86",
+      "name": "Check Duplicate topic"
+    },
+    {
+      "parameters": {
+        "operation": "rowNotExists",
+        "dataTableId": {
+          "__rl": true,
+          "value": "EZzcbjllTAxkF1oL",
+          "mode": "list",
+          "cachedResultName": "research_topics",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/EZzcbjllTAxkF1oL"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "topic_key",
+              "keyValue": "={{ $json.topic_key }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        -64
+      ],
+      "id": "b680be7c-c7c7-4704-8062-dc25ee3f3997",
+      "name": "Check new topic"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{\n  {\n    success: false,\n    duplicate: true,\n    message: \"This research topic is already registered.\",\n    researcher: $json.researcher,\n    topic: $json.topic\n  }\n}}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1408,
+        -240
+      ],
+      "id": "d9abff23-d015-49f8-9b0c-d24e84269266",
+      "name": "Duplicate Topic Response"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "EZzcbjllTAxkF1oL",
+          "mode": "list",
+          "cachedResultName": "research_topics",
+          "cachedResultUrl": "/projects/YqJ3CwtTpfzXuOD6/datatables/EZzcbjllTAxkF1oL"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "active": "={{ $json.active }}",
+            "topic_id": "={{ $json.topic_id }}",
+            "researcher": "={{ $json.researcher }}",
+            "email": "={{ $json.email }}",
+            "topic": "={{ $json.topic }}",
+            "topic_key": "={{ $json.topic_key }}",
+            "keywords": "={{ $json.keywords }}",
+            "frequency": "={{ $json.frequency }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "active",
+              "displayName": "active",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic_id",
+              "displayName": "topic_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "researcher",
+              "displayName": "researcher",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic_key",
+              "displayName": "topic_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "keywords",
+              "displayName": "keywords",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "frequency",
+              "displayName": "frequency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1408,
+        -64
+      ],
+      "id": "f4c4ee0b-020c-4560-a0ef-db6c8c04ba2d",
+      "name": "Insert Row"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{\n  {\n    success: true,\n    duplicate: false,\n    message: \"Research topic registered successfully.\",\n    topic_id: $json.topic_id,\n    researcher: $json.researcher,\n    topic: $json.topic,\n    frequency: $json.frequency\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1632,
+        -64
+      ],
+      "id": "4a597ded-a75d-4efe-9003-d88cb7c0e098",
+      "name": "Registration Success Response"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Audit event for workflow 06\nconst t = $input.first().json;\nreturn [{ json: {\n  workflow: $workflow.name,\n  event: 'topic_registered',\n  level: 'info',\n  message: `Topic \"${t.topic}\" registered for ${t.researcher}`,\n  details: { topic_id: t.topic_id, frequency: t.frequency },\n  execution_id: $execution.id\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        120
+      ],
+      "id": "60a8fe71-af75-456e-8b70-6748afaa8608",
+      "name": "Build Audit Event"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "KiRjquybEkOBf87E",
+          "mode": "list",
+          "cachedResultName": "06 - Error Handler & Audit Log",
+          "cachedResultUrl": "/workflow/KiRjquybEkOBf87E"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1850,
+        120
+      ],
+      "id": "2fda0366-4512-4b3c-ab2b-d645416ffd98",
+      "name": "Log to Audit Trail"
+    }
+  ],
+  "connections": {
+    "Generate Topic Record": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate topic",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check new topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Valid Input?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Input?": {
+      "main": [
+        [
+          {
+            "node": "Generate Topic Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validation Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate topic": {
+      "main": [
+        [
+          {
+            "node": "Duplicate Topic Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check new topic": {
+      "main": [
+        [
+          {
+            "node": "Insert Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Row": {
+      "main": [
+        [
+          {
+            "node": "Registration Success Response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Audit Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Audit Event": {
+      "main": [
+        [
+          {
+            "node": "Log to Audit Trail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "KiRjquybEkOBf87E"
+  }
+}
